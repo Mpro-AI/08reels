@@ -284,7 +284,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                               }}
                             />
                             <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
-                              {employee.email}
+                              {employee.name}
                             </Label>
                           </div>
                         ))}
