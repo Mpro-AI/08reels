@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, ReactNode } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Auth } from 'firebase/auth';
-import { Firestore } from 'firebase/firestore';
-import { FirebaseStorage } from 'firebase/storage';
+import { Auth, getAuth } from 'firebase/auth';
+import { Firestore, getFirestore } from 'firebase/firestore';
+import { FirebaseStorage, getStorage } from 'firebase/storage';
 
 import { initializeFirebase, FirebaseProvider } from '@/firebase';
 
@@ -23,8 +23,16 @@ export function FirebaseClientProvider({
 
   useEffect(() => {
     const init = async () => {
-      const firebaseInstances = await initializeFirebase();
-      setFirebase(firebaseInstances);
+      try {
+        const app = await initializeFirebase();
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+        const storage = getStorage(app);
+        setFirebase({ app, auth, firestore, storage });
+      } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        // You might want to show an error message to the user here
+      }
     };
 
     init();
