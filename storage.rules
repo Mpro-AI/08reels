@@ -5,7 +5,7 @@ service firebase.storage {
     // By default, allow all authenticated users to read and write.
     // This is not secure. You should restrict access based on your app's needs.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
