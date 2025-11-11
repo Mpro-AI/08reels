@@ -15,8 +15,8 @@ const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'sec
 };
 
 export default function VideoCard({ video }: { video: Video }) {
-  const latestVersion = [...video.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0];
-  const statusInfo = statusMap[latestVersion.status];
+  const latestVersion = video.versions.length > 0 ? [...video.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] : null;
+  const statusInfo = latestVersion ? statusMap[latestVersion.status] : null;
 
   return (
     <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1">
@@ -38,11 +38,13 @@ export default function VideoCard({ video }: { video: Video }) {
         </Link>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground space-y-2">
-         <div className="flex items-center gap-2">
-           <GitBranch className="size-4"/> 
-           <span>最新版本 v{latestVersion.versionNumber.toString().padStart(2, '0')}</span>
-           <Badge variant={statusInfo.variant} className="ml-auto">{statusInfo.text}</Badge>
-         </div>
+         {latestVersion && statusInfo && (
+            <div className="flex items-center gap-2">
+              <GitBranch className="size-4"/> 
+              <span>最新版本 v{latestVersion.versionNumber.toString().padStart(2, '0')}</span>
+              <Badge variant={statusInfo.variant} className="ml-auto">{statusInfo.text}</Badge>
+            </div>
+         )}
          <div className="flex items-center gap-2">
             <User className="size-4"/>
             <span>作者：{video.author.name}</span>

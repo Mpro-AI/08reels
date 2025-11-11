@@ -1,5 +1,5 @@
 'use client';
-import { useState, ReactNode, useEffect, useMemo } from 'react';
+import { useState, ReactNode, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,24 +11,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { Video, User } from '@/lib/types';
 import { addVideo } from '@/firebase/firestore/videos';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { uploadVideoAndGetUrl } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { collection } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
-const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"];
 
 const formSchema = z.object({
   title: z.string().min(1, '標題為必填欄位'),
@@ -45,12 +44,11 @@ const formSchema = z.object({
 type UploadVideoForm = z.infer<typeof formSchema>;
 
 interface UploadVideoDialogProps {
-  children: ReactNode;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVideoDialogProps) {
+export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
@@ -73,7 +71,7 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
       setIsSubmitting(false);
       setUploadProgress(0);
     }
-  }, [isOpen, form, user]);
+  }, [isOpen, form]);
 
   const handleClose = () => {
     if (isSubmitting) return;
@@ -94,7 +92,7 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
         const { downloadURL, videoId } = await uploadVideoAndGetUrl(
           storage, 
           videoFile, 
-          setUploadProgress,
+          setUploadProgress
         );
 
         const newVideoData = {
@@ -117,10 +115,10 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
   };
   
   const isUploading = isSubmitting && uploadProgress > 0 && uploadProgress < 100;
+  const fileRef = form.register("videoFile");
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      {children}
       <DialogContent className="sm:max-w-[425px]">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -139,8 +137,8 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
                     <FormLabel className="text-right">標題</FormLabel>
-                    <FormControl className="col-span-3">
-                      <Input {...field} disabled={isSubmitting} />
+                    <FormControl>
+                      <Input className="col-span-3" {...field} disabled={isSubmitting} />
                     </FormControl>
                   </FormItem>
                 )}
@@ -151,8 +149,8 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
                 render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-start gap-4">
                     <FormLabel className="text-right pt-2">備註</FormLabel>
-                    <FormControl className="col-span-3">
-                      <Textarea placeholder="（選填）影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
+                    <FormControl>
+                      <Textarea className="col-span-3" placeholder="（選填）影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
                     </FormControl>
                   </FormItem>
                 )}
@@ -160,16 +158,16 @@ export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVide
               <FormField
                 control={form.control}
                 name="videoFile"
-                render={({ field: { onChange, value, ...rest }}) => (
+                render={({ field }) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
                     <FormLabel className="text-right">影片檔案</FormLabel>
-                    <FormControl className="col-span-3">
+                    <FormControl>
                        <Input 
                           type="file" 
-                          accept="video/mp4,video/quicktime,video/x-msvideo" 
+                          className="col-span-3"
+                          accept="video/mp4,video/quicktime,video/x-msvideo,video/avi" 
                           disabled={isSubmitting}
-                          onChange={(e) => onChange(e.target.files)}
-                          {...rest}
+                          {...fileRef}
                        />
                     </FormControl>
                   </FormItem>

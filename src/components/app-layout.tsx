@@ -9,7 +9,7 @@ import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {
@@ -29,9 +29,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const firestore = useFirestore();
   const videosQuery = useMemo(() => {
-    if (!firestore || !isAuthenticated) return null;
-    return collection(firestore, 'videos');
-  }, [firestore, isAuthenticated]);
+    if (!firestore) return null;
+    return query(collection(firestore, 'videos'));
+  }, [firestore]);
 
   const { data: videos, loading: videosLoading } = useCollection<Video>(videosQuery);
 
@@ -53,8 +53,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   
+  const sortedVideos = useMemo(() => {
+    if (!videos) return [];
+    return [...videos].sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  }, [videos]);
+  
   return (
-    <AppLayoutContext.Provider value={{ videos, loading: videosLoading }}>
+    <AppLayoutContext.Provider value={{ videos: sortedVideos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
@@ -74,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenu>
               <SidebarMenu className="mt-4">
                   <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">專案列表</p>
-                  {videosLoading && Array.from({ length: 3 }).map((_, i) => (
+                  {videosLoading && !videos && Array.from({ length: 3 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <div className="flex items-center gap-2 p-2">
                         <Skeleton className="size-4" />
@@ -82,9 +87,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </div>
                     </SidebarMenuItem>
                   ))}
-                  {videos?.map(video => (
+                  {sortedVideos?.map(video => (
                       <SidebarMenuItem key={video.id}>
-                          <SidebarMenuButton asChild tooltip={video.title} isActive={pathname === `/videos/${video.id}`}>
+                          <SidebarMenuButton asChild tooltip={video.title} isActive={pathname.startsWith(`/videos/${video.id}`)}>
                               <Link href={`/videos/${video.id}`}>
                                   <Film />
                                   <span>{video.title}</span>

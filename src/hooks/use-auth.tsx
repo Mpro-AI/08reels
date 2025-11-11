@@ -27,51 +27,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
 
   const updateUserProfileInFirestore = useCallback(async (firebaseUser: FirebaseUser) => {
-    if (!firestore || !firebaseUser) return;
+    if (!firestore || !firebaseUser) return null;
     const userRef = doc(firestore, 'users', firebaseUser.uid);
-    const idTokenResult = await firebaseUser.getIdTokenResult();
-    const appUser: User = {
-      id: firebaseUser.uid,
-      name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
-      email: firebaseUser.email,
-      photoURL: firebaseUser.photoURL,
-      role: idTokenResult.claims.admin ? 'admin' : 'employee',
-    };
-    try {
+    
+    // Check if user document already exists
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const existingData = userSnap.data() as User;
+      // If role is already admin, don't overwrite it
+      const role = existingData.role === 'admin' 
+        ? 'admin' 
+        : (await firebaseUser.getIdTokenResult()).claims.admin ? 'admin' : 'employee';
+
+      const appUser: User = {
+        ...existingData,
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || existingData.name || 'Anonymous',
+        email: firebaseUser.email || existingData.email,
+        photoURL: firebaseUser.photoURL || existingData.photoURL,
+        role: role,
+      };
       await setDoc(userRef, appUser, { merge: true });
-    } catch (error) {
-      console.error("Failed to update user profile in Firestore", error);
+      return appUser;
+    } else {
+      // New user
+      const idTokenResult = await firebaseUser.getIdTokenResult();
+      const appUser: User = {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
+        email: firebaseUser.email,
+        photoURL: firebaseUser.photoURL,
+        role: idTokenResult.claims.admin ? 'admin' : 'employee',
+      };
+      await setDoc(userRef, appUser, { merge: true });
+      return appUser;
     }
-    return appUser;
   }, [firestore]);
 
 
   useEffect(() => {
-    if (!firestore) return;
-
-    // One-time script to ensure the admin user exists in Firestore
-    const ensureAdminUserExists = async () => {
-      const adminUid = 'VPkSokn932hWjebe6HpAqEcUWnX2';
-      const userRef = doc(firestore, 'users', adminUid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        const adminUser: User = {
-          id: adminUid,
-          name: 'ktphinhin9999',
-          email: 'ktphinhin9999@hotmail.com',
-          photoURL: null,
-          role: 'admin',
-        };
-        try {
-          await setDoc(userRef, adminUser);
-          console.log('Admin user manually added to Firestore.');
-        } catch (error) {
-          console.error('Failed to manually add admin user:', error);
-        }
-      }
-    };
-    ensureAdminUserExists();
-    
     if (!firebaseAuth) {
       setLoading(false);
       return;
