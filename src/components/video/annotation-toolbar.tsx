@@ -44,6 +44,9 @@ export default function AnnotationToolbar({
         <ToggleGroupItem value="pen" aria-label="Pen tool">
           <Pen className="h-4 w-4" />
         </ToggleGroupItem>
+        <ToggleGroupItem value="text" aria-label="Text tool">
+          <Type className="h-4 w-4" />
+        </ToggleGroupItem>
       </ToggleGroup>
       
       {(mode === 'pen' || mode === 'text') && (
