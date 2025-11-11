@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Wand2, Check, Edit, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { suggestAnnotationsWithAI, type SuggestAnnotationsWithAIOutput } from '@/ai/flows/suggest-annotations-with-ai';
 import { Video } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
