@@ -73,10 +73,13 @@ export default function CommentSection({
             onChange={(e) => onInputValueChange(e.target.value)}
           />
           <div className="flex gap-2">
-            <Button className="w-full" onClick={handleAddComment} disabled={!inputValue.trim()}>
+            <Button className="flex-1" onClick={handleAddComment} disabled={!inputValue.trim()}>
                 <Plus className="mr-2 h-4 w-4" />
                 新增評論
             </Button>
+            <Button variant="outline" onClick={() => onEnterAnnotationMode('pen')}><PenLine className="h-4 w-4"/></Button>
+            <Button variant="outline" onClick={() => onEnterAnnotationMode('image')}><ImageUp className="h-4 w-4"/></Button>
+            <Button variant="outline" onClick={() => onEnterAnnotationMode('text')}><Type className="h-4 w-4"/></Button>
           </div>
         </div>
         <div className="space-y-4 max-h-[calc(100vh-25rem)] overflow-y-auto pr-2">
@@ -104,15 +107,6 @@ export default function CommentSection({
                     "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
                     "opacity-0 group-hover/comment:opacity-100 transition-opacity"
                 )}>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground/80 hover:text-foreground" onClick={() => onEnterAnnotationMode('pen')}>
-                        <PenLine className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground/80 hover:text-foreground" onClick={() => onEnterAnnotationMode('image')}>
-                        <ImageUp className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground/80 hover:text-foreground" onClick={() => onEnterAnnotationMode('text')}>
-                        <Type className="h-3.5 w-3.5"/>
-                    </Button>
                     {canDelete(comment) && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
