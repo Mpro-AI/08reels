@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 
 interface AuthContextType {
@@ -15,14 +15,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock PINs for demo purposes - we will fetch users from Firestore
-const PINS: Record<string, string> = {
-  '2652': 'Admin User',
-  '3768': '員工 A',
-  '9564': '員工 B',
-};
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -37,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: users, loading: usersLoading } = useCollection<User>(usersQuery);
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
-    if (usersLoading || !users) {
+    if (usersLoading || !firestore) {
         toast({
             variant: "destructive",
             title: "登入錯誤",
@@ -46,23 +38,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
     }
 
-    const userNameToFind = PINS[pin];
-    if (userNameToFind) {
-      const matchedUser = users.find(u => u.name === userNameToFind);
-      if (matchedUser) {
-        setUser(matchedUser);
-        return true;
-      }
-    }
-    
-    toast({
-        variant: "destructive",
-        title: "登入失敗",
-        description: "PIN 錯誤，請重試。",
-    });
-    return false;
+    const pinQuery = query(collection(firestore, "users"), where("pin", "==", pin));
 
-  }, [toast, users, usersLoading]);
+    try {
+      const querySnapshot = await getDocs(pinQuery);
+      if (querySnapshot.empty) {
+        toast({
+            variant: "destructive",
+            title: "登入失敗",
+            description: "PIN 碼錯誤，請重試。",
+        });
+        return false;
+      }
+
+      const matchedUser = querySnapshot.docs[0].data() as User;
+      matchedUser.id = querySnapshot.docs[0].id;
+      setUser(matchedUser);
+      return true;
+
+    } catch (error) {
+      console.error("Error logging in:", error);
+      toast({
+          variant: "destructive",
+          title: "登入錯誤",
+          description: "查詢使用者資料時發生問題。",
+      });
+      return false;
+    }
+
+  }, [toast, firestore, usersLoading]);
 
   const logout = useCallback(() => {
     setUser(null);
