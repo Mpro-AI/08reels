@@ -24,6 +24,7 @@ export function useCollection<T>(
 
   useEffect(() => {
     if (!q) {
+      setData(null);
       setLoading(false);
       return;
     }
