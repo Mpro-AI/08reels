@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from '@/hooks/use-auth';
 import { getAllUsers } from '@/firebase/firestore/users';
+import { Skeleton } from '../ui/skeleton';
 
 interface ManageVideoDialogProps {
   isOpen: boolean;
