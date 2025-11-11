@@ -54,7 +54,7 @@ export function addCommentToVersion(
     const newComment: Comment = {
       ...commentData,
       author,
-      id: doc(collection(db, 'videos')).id, // Firestore can generate an ID without creating a doc
+      id: doc(collection(db, 'dummy')).id, 
       createdAt: Timestamp.now().toDate().toISOString(),
     };
     
@@ -136,7 +136,7 @@ export async function addVersionToVideo(
         const latestVersionNumber = video.versions.reduce((max, v) => Math.max(max, v.versionNumber), 0);
   
         const newVersion: Version = {
-          id: doc(collection(db, 'videos')).id,
+          id: doc(collection(db, 'dummy')).id,
           versionNumber: latestVersionNumber + 1,
           status: 'pending_review',
           createdAt: Timestamp.now().toDate().toISOString(),
@@ -175,7 +175,7 @@ export async function addVideo(
     const videoRef = doc(db, 'videos', videoId);
     try {
         const firstVersion: Version = {
-            id: doc(collection(db, 'dummy')).id, // Generate a unique ID for the version
+            id: doc(collection(db, 'dummy')).id,
             versionNumber: 1,
             status: 'pending_review',
             createdAt: Timestamp.now().toDate().toISOString(),
@@ -187,7 +187,6 @@ export async function addVideo(
             notes: newVideoData.notes,
         };
         
-        // Get a random placeholder image
         const placeholder = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
 
         const newVideo: Omit<Video, 'id'> = {
@@ -210,6 +209,6 @@ export async function addVideo(
             requestResourceData: newVideoData,
         });
         errorEmitter.emit('permission-error', permissionError);
-        throw e; // Re-throw the error to be caught by the caller
+        throw e;
     }
 }

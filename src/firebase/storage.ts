@@ -42,8 +42,13 @@ export async function uploadVideoAndGetUrl(
       },
       async () => {
         onProgress(100);
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve({ downloadURL, videoId: videoProjectId });
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ downloadURL, videoId: videoProjectId });
+        } catch (error) {
+           console.error('Failed to get download URL:', error);
+           reject(error);
+        }
       }
     );
   });
