@@ -1,7 +1,3 @@
-// This file is intentionally left blank. 
-// The Firebase configuration will be populated during the build process.
-// For local development, you can add your configuration here.
-// DO NOT COMMIT YOUR CONFIGURATION TO VERSION CONTROL.
 export const getFirebaseConfig = () => {
   return {
     apiKey: "YOUR_API_KEY",
