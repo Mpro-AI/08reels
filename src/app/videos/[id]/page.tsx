@@ -239,7 +239,7 @@ export default function VideoPage() {
   }
 
   const allAnnotations = [...(selectedVersion.annotations || []), ...newAnnotations];
-  const visibleAnnotations = allAnnotations.filter(a => currentTime >= a.timecode && currentTime < a.timecode + 3);
+  const visibleAnnotations = allAnnotations.filter(a => currentTime >= a.timecode && currentTime < a.timecode + 0.5);
 
   return (
     <AppLayout>
