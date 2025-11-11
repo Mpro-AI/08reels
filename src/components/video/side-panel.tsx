@@ -7,7 +7,7 @@ import VersionSection from './version-section';
 import { Video, Version, VersionStatus, Comment } from '@/lib/types';
 import type { AnnotationMode } from '@/app/videos/[id]/page';
 import { useFirestore } from '@/firebase';
-import { addCommentToVersion, deleteCommentFromVersion } from '@/firebase/firestore/videos';
+import { addCommentToVersion } from '@/firebase/firestore/videos';
 import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
@@ -15,8 +15,10 @@ interface SidePanelProps {
   selectedVersion: Version;
   onVersionChange: (versionId: string) => void;
   onTimecodeClick: (timecode: number) => void;
-  currentTimeFormatted: string;
   onAnnotationClick: (timecode: number, mode: AnnotationMode) => void;
+  onDeleteComment: (commentId: string) => void;
+  onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
+  currentTimeFormatted: string;
 }
 
 export default function SidePanel({ 
@@ -24,8 +26,10 @@ export default function SidePanel({
     selectedVersion, 
     onVersionChange, 
     onTimecodeClick, 
-    currentTimeFormatted,
     onAnnotationClick,
+    onDeleteComment,
+    onVersionStatusChange,
+    currentTimeFormatted,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
   const firestore = useFirestore();
@@ -47,19 +51,6 @@ export default function SidePanel({
       },
       { id: user.id, name: user.name },
     );
-  };
-  
-  const handleDeleteComment = (commentId: string) => {
-    if (!firestore) return;
-    deleteCommentFromVersion(firestore, video.id, selectedVersion.id, commentId);
-  };
-
-  const handleStatusChange = (versionId: string, status: VersionStatus) => {
-     if (!firestore) return;
-     // This logic is now handled in the parent component via props, 
-     // but if it were here, it would look like this:
-     // setVersionStatus(firestore, video.id, versionId, status);
-     console.log("Status change requested in side panel, but handled by parent:", {versionId, status});
   };
 
   const formatTime = (seconds: number): string => {
@@ -92,7 +83,7 @@ export default function SidePanel({
                     onAddComment={handleAddComment}
                     inputValue={commentInput}
                     onInputValueChange={setCommentInput}
-                    onDeleteComment={handleDeleteComment}
+                    onDeleteComment={onDeleteComment}
                     onAnnotationClick={onAnnotationClick}
                 />
             </TabsContent>
@@ -102,7 +93,7 @@ export default function SidePanel({
                   versions={video.versions} 
                   selectedVersionId={selectedVersion.id}
                   onVersionChange={onVersionChange}
-                  onStatusChange={handleStatusChange}
+                  onStatusChange={onVersionStatusChange}
                 />
             </TabsContent>
         </div>

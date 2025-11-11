@@ -93,9 +93,6 @@ export default function VideoPage() {
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (playerRef.current) {
       playerRef.current.currentTime = timecode;
-      if (playerRef.current.paused) {
-        playerRef.current.play();
-      }
     }
   }, []);
 
@@ -308,6 +305,15 @@ export default function VideoPage() {
     setTextAnnotationCoords(null);
   };
 
+  const togglePlayPause = () => {
+    if (!playerRef.current) return;
+    if (playerRef.current.paused) {
+      playerRef.current.play();
+    } else {
+      playerRef.current.pause();
+    }
+  };
+
 
   useEffect(() => {
     const videoElement = playerRef.current;
@@ -317,6 +323,25 @@ export default function VideoPage() {
     videoElement.addEventListener('timeupdate', onTimeUpdate);
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
   }, [playerRef, selectedVersion]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        const target = event.target as HTMLElement;
+        // Don't trigger if user is typing in an input/textarea
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          return;
+        }
+        event.preventDefault();
+        togglePlayPause();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
   
   if (loading || !video || !selectedVersion) {
     return (
@@ -397,6 +422,8 @@ export default function VideoPage() {
                         onTimecodeClick={handleTimecodeClick} 
                         onAnnotationClick={handleAnnotationClick}
                         currentTimeFormatted={formatTime(currentTime)}
+                        onDeleteComment={handleDeleteComment}
+                        onVersionStatusChange={handleVersionStatusChange}
                     />
                 </div>
             </main>
