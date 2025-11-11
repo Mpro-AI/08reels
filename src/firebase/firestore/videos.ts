@@ -78,7 +78,7 @@ export function addCommentToVersion(
   videoId: string,
   versionId: string,
   commentData: Omit<Comment, 'id' | 'createdAt' | 'author'>,
-  author: User, // Changed to full User object
+  author: User,
 ) {
   const videoRef = doc(db, 'videos', videoId);
   runTransaction(db, async (transaction) => {
@@ -95,7 +95,7 @@ export function addCommentToVersion(
 
     const newComment: Comment = {
       ...commentData,
-      author, // Pass the full author object
+      author,
       id: doc(collection(db, 'dummy')).id, 
       createdAt: Timestamp.now().toDate().toISOString(),
     };

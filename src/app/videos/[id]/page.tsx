@@ -142,7 +142,10 @@ export default function VideoPage() {
   const handleSaveAnnotations = () => {
     if (!firestore || !user || !video || !selectedVersionId || newAnnotations.length === 0) return;
     
-    addAnnotationToVersion(firestore, video.id, selectedVersionId, newAnnotations);
+    // The `id` will be generated within the firestore function for each annotation
+    const annotationsToAdd = newAnnotations.map(({id, ...rest}) => rest);
+    
+    addAnnotationToVersion(firestore, video.id, selectedVersionId, annotationsToAdd);
     
     setNewAnnotations([]);
     setIsDrawing(false);
