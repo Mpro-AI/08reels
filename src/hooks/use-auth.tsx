@@ -29,11 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfileInFirestore = useCallback(async (firebaseUser: FirebaseUser) => {
     if (!firestore || !firebaseUser) return;
     const userRef = doc(firestore, 'users', firebaseUser.uid);
+    const idTokenResult = await firebaseUser.getIdTokenResult();
     const appUser: User = {
       id: firebaseUser.uid,
       name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
       email: firebaseUser.email,
       photoURL: firebaseUser.photoURL,
+      role: idTokenResult.claims.admin ? 'admin' : 'employee',
     };
     try {
       await setDoc(userRef, appUser, { merge: true });
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: 'ktphinhin9999',
           email: 'ktphinhin9999@hotmail.com',
           photoURL: null,
+          role: 'admin',
         };
         try {
           await setDoc(userRef, adminUser);

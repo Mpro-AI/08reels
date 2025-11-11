@@ -3,6 +3,7 @@ export type User = {
   name: string;
   email?: string | null;
   photoURL?: string | null;
+  role?: 'admin' | 'employee';
 };
 
 export type Comment = {
