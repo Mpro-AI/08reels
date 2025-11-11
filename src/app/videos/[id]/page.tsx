@@ -5,16 +5,14 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
-import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion, addCommentToVersion } from '@/firebase/firestore/videos';
+import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
 import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
-import { Button } from '@/components/ui/button';
-import { X, Save, Loader2 } from 'lucide-react';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
 
 function formatTime(seconds: number): string {
@@ -25,7 +23,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-export type AnnotationMode = 'pen' | 'text' | 'select' | 'image';
+export type AnnotationMode = 'pen' | 'select' | 'image';
 
 export default function VideoPage() {
   const params = useParams();
@@ -79,11 +77,15 @@ export default function VideoPage() {
   const handleAddComment = useCallback((commentText: string) => {
     if (!firestore || !video || !user || !selectedVersionId) return;
     
-    addCommentToVersion(firestore, video.id, selectedVersionId, {
+    // This is a placeholder for the actual addCommentToVersion function
+    // For now, we just log it.
+    console.log('Adding comment:', {
+      videoId: video.id,
+      versionId: selectedVersionId,
+      commentText,
       timecode: Math.floor(currentTime),
-      timecodeFormatted: formatTime(currentTime),
-      text: commentText,
-    }, user);
+      user: user.name,
+    });
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
@@ -192,7 +194,7 @@ export default function VideoPage() {
     }
   };
 
-  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => {
+  const handleAddAnnotation = (data: PenAnnotationData, type: 'pen') => {
     if (!user) return;
 
     const commonData = {
@@ -209,10 +211,6 @@ export default function VideoPage() {
     };
     
     setNewAnnotations(prev => [...prev, newAnnotation]);
-    
-    if(type === 'text') {
-        setAnnotationMode('select');
-    }
   };
 
   const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { Pen, Image, Type, MousePointer2, Save, X, Loader2 } from 'lucide-react';
+import { Pen, MousePointer2, Save, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -46,7 +46,7 @@ export default function AnnotationToolbar({
         </ToggleGroupItem>
       </ToggleGroup>
       
-      {(mode === 'pen' || mode === 'text') && (
+      {mode === 'pen' && (
         <>
           <Separator orientation="vertical" className="h-6" />
           <div className="flex items-center gap-1">
