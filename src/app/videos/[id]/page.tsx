@@ -66,14 +66,13 @@ export default function VideoPage() {
     
     const commentTime = timecode !== undefined ? timecode : currentTime;
 
-    const newComment: Omit<Comment, 'id' | 'createdAt'> = {
+    const newComment: Omit<Comment, 'id' | 'createdAt' | 'author'> = {
       timecode: Math.floor(commentTime),
       timecodeFormatted: formatTime(commentTime),
       text: commentText,
-      author: { id: user.id, name: user.name },
     };
     
-    addCommentToVersion(firestore, video.id, selectedVersionId, newComment);
+    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, { id: user.id, name: user.name });
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 

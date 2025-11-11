@@ -9,7 +9,7 @@ import {
   runTransaction,
   collection,
 } from 'firebase/firestore';
-import type { Video, Comment, VersionStatus } from '@/lib/types';
+import type { Video, Comment, VersionStatus, User } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -33,7 +33,8 @@ export function addCommentToVersion(
   db: Firestore,
   videoId: string,
   versionId: string,
-  commentData: Omit<Comment, 'id' | 'createdAt'>
+  commentData: Omit<Comment, 'id' | 'createdAt' | 'author'>,
+  author: Pick<User, 'id' | 'name'>,
 ) {
   const videoRef = doc(db, 'videos', videoId);
   runTransaction(db, async (transaction) => {
@@ -50,6 +51,7 @@ export function addCommentToVersion(
 
     const newComment: Comment = {
       ...commentData,
+      author,
       id: doc(collection(db, 'videos')).id, // Firestore can generate an ID without creating a doc
       createdAt: Timestamp.now().toDate().toISOString(),
     };

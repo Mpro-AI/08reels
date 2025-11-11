@@ -2,8 +2,126 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && getUserData(request.auth.uid).role == 'admin';
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if false; // For this app, client-side writes to user profiles are disabled.
+    }
+    
+    // Rules for the 'videos' collection
+    match /videos/{videoId} {
+      allow read: if isSignedIn();
+      allow create: if false; // For this app, client-side video creation is disabled.
+      
+      // Allow updates (like adding comments or changing status)
+      allow update: if isSignedIn() && (
+        // Allow anyone signed in to add a comment
+        isAddingComment() ||
+        // Allow only admins to change version status
+        isChangingVersionStatusByAdmin()
+      );
+      
+      function isAddingComment() {
+        let videoBefore = resource.data;
+        let videoAfter = request.resource.data;
+        
+        // Ensure no other fields are changed besides the 'versions' array
+        let otherFieldsUnchanged = videoAfter.keys().removeAll(['versions']).size() == videoBefore.keys().removeAll(['versions']).size()
+          && videoAfter.diff(videoBefore).affectedKeys.removeAll(['versions']).size() == 0;
+          
+        let versionChange = getVersionChange(videoBefore.versions, videoAfter.versions);
+        
+        // Ensure only one version is being changed
+        return otherFieldsUnchanged && versionChange != null && isAddingSingleCommentToVersion(versionChange.before, versionChange.after);
+      }
+      
+      function isAddingSingleCommentToVersion(versionBefore, versionAfter) {
+         let commentsBefore = versionBefore.comments;
+         let commentsAfter = versionAfter.comments;
+         
+         let addedComments = commentsAfter.removed(commentsBefore);
+         let removedComments = commentsBefore.removed(commentsAfter);
+         
+         // Ensure only one comment is added, and none are removed.
+         return addedComments.size() == 1 && removedComments.size() == 0 &&
+                // Ensure the new comment author is the current user.
+                addedComments[0].author.id == request.auth.uid &&
+                // Ensure no other fields in the version were changed.
+                versionAfter.diff(versionBefore).affectedKeys.removeAll(['comments']).size() == 0;
+      }
+      
+      function isChangingVersionStatusByAdmin() {
+        if (!isAdmin()) {
+          return false;
+        }
+        
+        let videoBefore = resource.data;
+        let videoAfter = request.resource.data;
+
+        let otherFieldsUnchanged = videoAfter.keys().removeAll(['versions']).size() == videoBefore.keys().removeAll(['versions']).size()
+          && videoAfter.diff(videoBefore).affectedKeys.removeAll(['versions']).size() == 0;
+
+        let versionChange = getVersionChange(videoBefore.versions, videoAfter.versions);
+
+        return otherFieldsUnchanged && versionChange != null && isOnlyStatusOrActiveChanged(versionChange.before, versionChange.after);
+      }
+
+      function isOnlyStatusOrActiveChanged(versionBefore, versionAfter) {
+        let changedKeys = versionAfter.diff(versionBefore).affectedKeys;
+        // Only 'status' and/or 'isCurrentActive' are allowed to change
+        return changedKeys.hasAny(['status', 'isCurrentActive']) && changedKeys.removeAll(['status', 'isCurrentActive']).size() == 0;
+      }
+      
+      // This function finds the single changed version between two version lists.
+      // It returns an object { before: versionBefore, after: versionAfter } if exactly one version is changed.
+      // It returns null otherwise.
+      function getVersionChange(versionsBefore, versionsAfter) {
+        if (versionsBefore.size() != versionsAfter.size()) {
+          return null;
+        }
+        
+        let changedVersionId = null;
+        let changeCount = 0;
+        
+        // Find changed version ID
+        // This is a simplified check. A more robust implementation might compare hashes of each version object.
+        let changedIndices = [];
+        for (let i = 0; i < versionsBefore.size(); i = i + 1) {
+          if (versionsBefore[i] != versionsAfter[i]) {
+            changedIndices = changedIndices.concat([i]);
+          }
+        }
+        
+        if (changedIndices.size() != 1) {
+          return null; // No change or more than one version changed
+        }
+        
+        let index = changedIndices[0];
+        
+        if (versionsBefore[index].id != versionsAfter[index].id) {
+           return null; // ID changed, which is not allowed.
+        }
+
+        return { before: versionsBefore[index], after: versionsAfter[index] };
+      }
     }
   }
 }
