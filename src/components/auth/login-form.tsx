@@ -15,10 +15,10 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const success = login(pin);
+    const success = await login(pin);
     if (success) {
       const redirectUrl = searchParams.get('redirect') || '/';
       router.push(redirectUrl);
@@ -48,7 +48,6 @@ export function LoginForm() {
               onChange={(e) => setPin(e.target.value)}
               placeholder="••••"
               required
-              minLength={4}
               maxLength={4}
               disabled={isLoading}
               className="text-center text-lg tracking-[0.5em]"

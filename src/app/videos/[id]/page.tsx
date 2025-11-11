@@ -1,6 +1,6 @@
 'use client';
 import { useParams } from 'next/navigation';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/video-player';
@@ -9,6 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { setVideo, addCommentToVersion, setVersionStatus } from '@/firebase/firestore/videos';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -21,12 +25,17 @@ function formatTime(seconds: number): string {
 export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
+  const firestore = useFirestore();
+
+  const videoRef = useMemo(() => {
+    if (!firestore || !videoId) return null;
+    return doc(firestore, 'videos', videoId);
+  }, [firestore, videoId]);
+
+  const { data: video, loading } = useDoc<Video>(videoRef);
   
-  const [video, setVideo] = useState<Video | undefined>(undefined);
-
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
-
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -34,66 +43,53 @@ export default function VideoPage() {
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
   useEffect(() => {
-    // This will be replaced with data fetching
-  }, [videoId]);
+    if (video && !selectedVersionId) {
+        const currentActiveVersion = video.versions.find(v => v.isCurrentActive);
+        if (currentActiveVersion) {
+            setSelectedVersionId(currentActiveVersion.id);
+        } else if (video.versions.length > 0) {
+            const latestVersion = video.versions.sort((a,b) => b.versionNumber - a.versionNumber)[0];
+            setSelectedVersionId(latestVersion.id);
+        }
+    }
+  }, [video, selectedVersionId]);
 
   const handleTimecodeClick = useCallback((timecode: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = timecode;
-      videoRef.current.play();
+    if (playerRef.current) {
+      playerRef.current.currentTime = timecode;
+      playerRef.current.play();
     }
   }, []);
 
   const handleAddComment = useCallback((commentText: string, timecode?: number) => {
-    if (!video || !user || !selectedVersionId) return;
+    if (!firestore || !video || !user || !selectedVersionId) return;
     
     const commentTime = timecode !== undefined ? timecode : currentTime;
 
-    const newComment: Comment = {
-      id: `comment-${Date.now()}`,
+    const newComment: Omit<Comment, 'id' | 'createdAt'> = {
       timecode: Math.floor(commentTime),
       timecodeFormatted: formatTime(commentTime),
       text: commentText,
       author: { id: user.id, name: user.name },
-      createdAt: new Date().toISOString(),
     };
+    
+    addCommentToVersion(firestore, video.id, selectedVersionId, newComment);
 
-    // This logic will be moved to a Firestore update
-    const updatedVideo = { ...video };
-    const versionIndex = updatedVideo.versions.findIndex(v => v.id === selectedVersionId);
-    if (versionIndex !== -1) {
-      updatedVideo.versions[versionIndex].comments.push(newComment);
-      setVideo(updatedVideo);
-    }
-
-  }, [video, user, currentTime, selectedVersionId]);
+  }, [firestore, video, user, currentTime, selectedVersionId]);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
-    if (!video) return;
+    if (!firestore || !video) return;
 
-    let isNewActiveVersion = status === 'approved';
-    const updatedVideo = { ...video };
-    updatedVideo.versions = updatedVideo.versions.map(ver => {
-      let newVer = {...ver};
-      if (ver.id === versionId) {
-        newVer.status = status;
-        newVer.isCurrentActive = isNewActiveVersion;
-      } else if (isNewActiveVersion) {
-        newVer.isCurrentActive = false;
-      }
-      return newVer;
-    });
-
-    setVideo(updatedVideo);
+    setVersionStatus(firestore, video.id, versionId, status);
     
     toast({
       title: '版本狀態已更新',
     });
-  }, [video, toast]);
+  }, [firestore, video, toast]);
 
 
   useEffect(() => {
-    const videoElement = videoRef.current;
+    const videoElement = playerRef.current;
     if (!videoElement) return;
 
     const onTimeUpdate = () => setCurrentTime(videoElement.currentTime);
@@ -101,7 +97,7 @@ export default function VideoPage() {
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
   }, []);
   
-  if (!video || !selectedVersion) {
+  if (loading || !video || !selectedVersion) {
     return (
         <AppLayout>
             <div className="flex flex-1 flex-col">
@@ -126,7 +122,7 @@ export default function VideoPage() {
             <Header title={video.title} />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center">
-                    <VideoPlayer src={selectedVersion.videoUrl || video.videoUrl} videoRef={videoRef} />
+                    <VideoPlayer src={selectedVersion.videoUrl || video.videoUrl} videoRef={playerRef} />
                 </div>
                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
                     <SidePanel 

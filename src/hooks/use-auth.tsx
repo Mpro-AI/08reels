@@ -1,64 +1,81 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
-// import { users } from '@/lib/mock-data'; // Will be replaced by firestore
+import { useCollection, useFirestore } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
-// This will be replaced by fetching from firestore
-const mockUsers: User[] = [
-  { id: 'user-1', name: 'Admin User', role: 'admin' },
-  { id: 'user-2', name: '員工 A', role: 'employee' },
-  { id: 'user-3', name: '員工 B', role: 'employee' },
-];
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
-  login: (pin: string) => boolean;
+  login: (pin: string) => Promise<boolean>;
   logout: () => void;
   setUserRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock PINs for demo purposes
-const PINS: Record<string, User> = {
-  '2652': mockUsers.find(u => u.role === 'admin')!,
-  '3768': mockUsers.find(u => u.role === 'employee' && u.name === '員工 A')!,
-  '9564': mockUsers.find(u => u.role === 'employee' && u.name === '員工 B')!,
+// Mock PINs for demo purposes - we will fetch users from Firestore
+const PINS: Record<string, string> = {
+  '2652': 'Admin User',
+  '3768': '員工 A',
+  '9564': '員工 B',
 };
 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
-  const login = useCallback((pin: string): boolean => {
-    const matchedUser = PINS[pin];
-    if (matchedUser) {
-      setUser(matchedUser);
-      return true;
-    } else {
-      // Simulate brute-force lockout
-      toast({
+  const usersQuery = useMemo(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+
+  const { data: users, loading: usersLoading } = useCollection<User>(usersQuery);
+
+  const login = useCallback(async (pin: string): Promise<boolean> => {
+    if (usersLoading || !users) {
+        toast({
+            variant: "destructive",
+            title: "登入錯誤",
+            description: "使用者資料尚未載入，請稍後再試。",
+        });
+        return false;
+    }
+
+    const userNameToFind = PINS[pin];
+    if (userNameToFind) {
+      const matchedUser = users.find(u => u.name === userNameToFind);
+      if (matchedUser) {
+        setUser(matchedUser);
+        return true;
+      }
+    }
+    
+    toast({
         variant: "destructive",
         title: "登入失敗",
         description: "PIN 錯誤，請重試。",
-      });
-      return false;
-    }
-  }, [toast]);
+    });
+    return false;
+
+  }, [toast, users, usersLoading]);
 
   const logout = useCallback(() => {
     setUser(null);
   }, []);
   
   const setUserRole = useCallback((role: UserRole) => {
-    const newUser = mockUsers.find(u => u.role === role);
-    if(newUser) {
-      setUser(newUser);
+    if (users) {
+        const newUser = users.find(u => u.role === role);
+        if(newUser) {
+          setUser(newUser);
+        }
     }
-  }, []);
+  }, [users]);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, setUserRole }}>
