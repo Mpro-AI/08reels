@@ -29,7 +29,7 @@ interface CommentSectionProps {
   inputValue: string;
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
-  onEnterAnnotationMode: (mode: AnnotationMode) => void;
+  onEnterAnnotationMode: (mode: AnnotationMode | 'image') => void;
 }
 
 export default function CommentSection({ 
@@ -51,7 +51,7 @@ export default function CommentSection({
     }
   };
   
-  const handleAnnotationClick = (timecode: number, mode: AnnotationMode) => {
+  const handleAnnotationClick = (timecode: number, mode: AnnotationMode | 'image') => {
     onCommentClick(timecode);
     onEnterAnnotationMode(mode);
   }

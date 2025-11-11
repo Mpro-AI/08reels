@@ -9,7 +9,7 @@ interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData | { x: number; y: number } | TextAnnotationData) => void;
+  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData) => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
   annotationMode: AnnotationMode;
   penColor: string;
@@ -253,11 +253,6 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       return;
     }
 
-    if (annotationMode === 'image') {
-       onAddAnnotation({ x: coords.x, y: coords.y });
-       return;
-    }
-
     if (annotationMode === 'text') {
         const text = prompt('請輸入文字內容：');
         if (text) {
@@ -371,7 +366,6 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   const cursor = () => {
     if(annotationMode === 'pen') return 'crosshair';
-    if(annotationMode === 'image') return 'copy';
     if(annotationMode === 'text') return 'text';
     if(action === 'dragging') return 'grabbing';
     if(action === 'resizing') return 'nwse-resize';

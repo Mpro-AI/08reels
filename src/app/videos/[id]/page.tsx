@@ -25,7 +25,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-export type AnnotationMode = 'pen' | 'image' | 'text' | 'select';
+export type AnnotationMode = 'pen' | 'text' | 'select';
 
 export default function VideoPage() {
   const params = useParams();
@@ -52,7 +52,6 @@ export default function VideoPage() {
   const [penLineWidth, setPenLineWidth] = useState(3);
   
   const [newAnnotations, setNewAnnotations] = useState<Annotation[]>([]);
-  const [imageAnnotationFile, setImageAnnotationFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const imageAnnotationInputRef = useRef<HTMLInputElement>(null);
   
@@ -136,23 +135,67 @@ export default function VideoPage() {
     }
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageAnnotationFile(file);
-      setAnnotationMode('image');
-      toast({ title: '圖片已選取', description: '請在影片畫面上點擊以放置圖片。' });
-    } else {
-      // No file selected, revert to select mode
-      setAnnotationMode('select'); 
+    if (!file || !storage || !user || !selectedVersionId || !video) {
+        // Reset file input if no file is selected
+        if (imageAnnotationInputRef.current) imageAnnotationInputRef.current.value = '';
+        return;
     }
-    // Reset file input to allow selecting the same file again
-    if (imageAnnotationInputRef.current) {
-      imageAnnotationInputRef.current.value = '';
+
+    setIsUploading(true);
+    setIsAnnotating(true); // Keep annotation mode active
+
+    try {
+        const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
+        
+        // Calculate image position and size
+        const playerWidth = playerRef.current?.clientWidth || 0;
+        const playerHeight = playerRef.current?.clientHeight || 0;
+        
+        const imageWidth = 200; // Default width
+        const tempImage = new Image();
+        tempImage.src = URL.createObjectURL(file);
+        await new Promise(resolve => tempImage.onload = resolve);
+        const aspectRatio = tempImage.width / tempImage.height;
+        const imageHeight = imageWidth / aspectRatio;
+        URL.revokeObjectURL(tempImage.src);
+
+        const newAnnotation: Omit<Annotation, 'id'> = {
+            type: 'image',
+            data: {
+                url: imageUrl,
+                x: (playerWidth - imageWidth) / 2,
+                y: (playerHeight - imageHeight) / 2,
+                width: imageWidth,
+                height: imageHeight,
+                rotation: 0,
+            } as ImageAnnotationData,
+            author: { id: user.id, name: user.name },
+            createdAt: new Date().toISOString(),
+            timecode: Math.floor(currentTime),
+        };
+        
+        // Save annotation immediately
+        addAnnotationsToVersion(firestore!, video.id, selectedVersionId, [newAnnotation]);
+
+        toast({ title: '圖片已新增', description: '您現在可以拖曳、縮放或旋轉圖片。' });
+
+    } catch (error) {
+        toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
+        console.error(error);
+    } finally {
+        setIsUploading(false);
+        // Do not exit annotation mode, allow user to edit immediately
+        // Reset file input to allow selecting the same file again
+        if (imageAnnotationInputRef.current) {
+          imageAnnotationInputRef.current.value = '';
+        }
+        setAnnotationMode('select'); // Switch to select mode to allow interaction
     }
   };
 
-  const handleAddAnnotation = async (data: PenAnnotationData | { x: number; y: number } | TextAnnotationData) => {
+  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData) => {
     if (!user) return;
 
     let newAnnotation: Omit<Annotation, 'id'> | null = null;
@@ -175,41 +218,6 @@ export default function VideoPage() {
             ...commonData,
         };
         setAnnotationMode('select');
-    } else if (annotationMode === 'image' && imageAnnotationFile && 'x' in data) {
-      setIsUploading(true);
-      try {
-        const imageUrl = await uploadAnnotationImage(storage!, imageAnnotationFile, videoId, selectedVersionId!);
-        
-        const imageWidth = 200; 
-        const tempImage = new Image();
-        tempImage.src = URL.createObjectURL(imageAnnotationFile);
-        await new Promise(resolve => tempImage.onload = resolve);
-        const aspectRatio = tempImage.width / tempImage.height;
-        const imageHeight = imageWidth / aspectRatio;
-        URL.revokeObjectURL(tempImage.src);
-
-        const imageAnnotation: Omit<Annotation, 'id'> = {
-            type: 'image',
-            data: {
-                url: imageUrl,
-                x: data.x - imageWidth / 2,
-                y: data.y - imageHeight / 2,
-                width: imageWidth,
-                height: imageHeight,
-                rotation: 0,
-            } as ImageAnnotationData,
-            ...commonData,
-        };
-        setNewAnnotations(prev => [...prev, { ...imageAnnotation, id: `new-${Date.now()}` } as Annotation]);
-        
-      } catch (error) {
-        toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
-        console.error(error);
-      } finally {
-        setIsUploading(false);
-        setImageAnnotationFile(null);
-        setAnnotationMode('select');
-      }
     }
     
     if (newAnnotation) {
@@ -259,7 +267,6 @@ export default function VideoPage() {
     setNewAnnotations([]);
     setIsAnnotating(false);
     setAnnotationMode('select');
-    setImageAnnotationFile(null);
     setIsUploading(false);
   };
 

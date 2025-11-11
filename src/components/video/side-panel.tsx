@@ -16,7 +16,7 @@ interface SidePanelProps {
   onAddComment: (commentText: string, timecode?: number) => void;
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
   onDeleteComment: (commentId: string) => void;
-  onEnterAnnotationMode: (mode: AnnotationMode) => void;
+  onEnterAnnotationMode: (mode: AnnotationMode | 'image') => void;
 }
 
 export default function SidePanel({ 
