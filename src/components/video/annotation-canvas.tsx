@@ -140,14 +140,14 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       ctx.fillStyle = '#09f';
       ctx.fillRect(data.width / 2 - HANDLE_SIZE / 2, data.height / 2 - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
 
-      // Draw rotation handle (top-right)
+      // Draw rotation handle (top-center)
       ctx.beginPath();
-      ctx.moveTo(data.width / 2, -data.height / 2);
-      ctx.lineTo(data.width / 2, -data.height / 2 - ROTATION_HANDLE_OFFSET);
+      ctx.moveTo(0, -data.height / 2);
+      ctx.lineTo(0, -data.height / 2 - ROTATION_HANDLE_OFFSET);
       ctx.strokeStyle = '#09f';
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(data.width / 2, -data.height / 2 - ROTATION_HANDLE_OFFSET, HANDLE_SIZE / 2, 0, 2 * Math.PI);
+      ctx.arc(0, -data.height / 2 - ROTATION_HANDLE_OFFSET, HANDLE_SIZE / 2, 0, 2 * Math.PI);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.strokeStyle = '#09f';
@@ -231,7 +231,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       }
       
       // Check rotation handle
-      const rotationHandleX = data.width / 2;
+      const rotationHandleX = 0;
       const rotationHandleY = -data.height / 2 - ROTATION_HANDLE_OFFSET;
       if (Math.sqrt((rotatedX - rotationHandleX)**2 + (rotatedY - rotationHandleY)**2) < HANDLE_SIZE) {
           return 'rotating';
@@ -252,31 +252,31 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       setCurrentPath([coords]);
       return;
     }
-
+    
     if (annotationMode === 'text') {
-        const text = prompt('請輸入文字內容：');
-        if (text) {
-            const ctx = getCanvasContext();
-            if (!ctx) return;
-            const fontSize = 24;
-            const fontFamily = 'Arial';
-            ctx.font = `${fontSize}px ${fontFamily}`;
-            const textMetrics = ctx.measureText(text);
+      const text = prompt('請輸入文字內容：');
+      if (text) {
+          const ctx = getCanvasContext();
+          if (!ctx) return;
+          const fontSize = 24;
+          const fontFamily = 'Arial';
+          ctx.font = `${fontSize}px ${fontFamily}`;
+          const textMetrics = ctx.measureText(text);
 
-            const textData: TextAnnotationData = {
-                text,
-                x: coords.x - textMetrics.width / 2,
-                y: coords.y - fontSize / 2,
-                width: textMetrics.width,
-                height: fontSize,
-                fontSize,
-                fontFamily,
-                color: penColor,
-                rotation: 0,
-            };
-            onAddAnnotation(textData, 'text');
-        }
-        return;
+          const textData: TextAnnotationData = {
+              text,
+              x: coords.x - textMetrics.width / 2,
+              y: coords.y - fontSize / 2,
+              width: textMetrics.width,
+              height: fontSize,
+              fontSize,
+              fontFamily,
+              color: penColor,
+              rotation: 0,
+          };
+          onAddAnnotation(textData, 'text');
+      }
+      return;
     }
 
     // Interaction with existing annotations if mode is 'select'
