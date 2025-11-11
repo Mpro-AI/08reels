@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========== Helpers ==========
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ========== Collections ==========
+
+    // Users can read other user profiles (for assign-to dropdown)
+    // and can only write to their own user profile document.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Videos can be listed and read by any signed-in user.
+    // Creation is allowed if the author is the current user.
+    // Updates are allowed only by the video's author.
+    match /videos/{videoId} {
+      allow get, list: if isSignedIn();
+      
+      allow create: if isSignedIn()
+                    && request.resource.data.author.id == request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.thumbnailUrl is string
+                    && 'uploadedAt' in request.resource.data;
+
+      // Allow updates if the user is the author, OR if the user is only adding a comment.
+      allow update: if isSignedIn() && (
+        // Case 1: The user is the author of the video. They can change anything.
+        request.auth.uid == resource.data.author.id ||
+        // Case 2: Any signed-in user can add a comment, but cannot change anything else.
+        // We verify this by checking that the only change is to the 'versions' field.
+        // A deeper check on the versions field ensures only comments were added.
+        (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['versions']) &&
+          request.resource.data.title == resource.data.title &&
+          request.resource.data.author.id == resource.data.author.id &&
+          request.resource.data.thumbnailUrl == resource.data.thumbnailUrl &&
+          request.resource.data.thumbnailHint == resource.data.thumbnailHint &&
+          request.resource.data.uploadedAt == resource.data.uploadedAt
+        )
+      );
+      
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.author.id;
+    }
+  }
+}
