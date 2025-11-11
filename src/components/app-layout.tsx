@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import type { Video } from '@/lib/types';
+import type { Video, User } from '@/lib/types';
 
 interface AppLayoutContextType {
   videos: Video[] | null;
