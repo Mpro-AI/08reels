@@ -5,7 +5,7 @@ import { MessageSquare, GitBranch, Wand2 } from 'lucide-react';
 import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import AiSuggestionSection from './ai-suggestion-section';
-import { Video, Version } from '@/lib/types';
+import { Video, Version, VersionStatus } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
@@ -15,9 +15,10 @@ interface SidePanelProps {
   onTimecodeClick: (timecode: number) => void;
   currentTimeFormatted: string;
   onAddComment: (commentText: string, timecode?: number) => void;
+  onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
 }
 
-export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment }: SidePanelProps) {
+export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment, onVersionStatusChange }: SidePanelProps) {
   const { user } = useAuth();
   const [commentInput, setCommentInput] = useState('');
 
@@ -58,6 +59,7 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
                   versions={video.versions} 
                   selectedVersionId={selectedVersion.id}
                   onVersionChange={onVersionChange}
+                  onStatusChange={onVersionStatusChange}
                 />
             </TabsContent>
             <TabsContent value="ai" className="m-0">

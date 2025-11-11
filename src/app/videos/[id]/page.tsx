@@ -7,8 +7,9 @@ import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
 import { videos as initialVideos } from '@/lib/mock-data';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Video, Version, Comment } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -17,7 +18,6 @@ function formatTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
-
 
 export default function VideoPage() {
   const params = useParams();
@@ -33,6 +33,7 @@ export default function VideoPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const { user } = useAuth();
+  const { toast } = useToast();
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
@@ -87,6 +88,48 @@ export default function VideoPage() {
 
   }, [video, user, currentTime, videos, selectedVersionId]);
 
+  const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
+    if (!video) return;
+
+    const updatedVideos = videos.map(v => {
+      if (v.id === video.id) {
+        let isNewActiveVersion = false;
+        const newVersions = v.versions.map(ver => {
+          // If setting a version to approved, it becomes the new active version
+          if (status === 'approved' && ver.id === versionId) {
+            isNewActiveVersion = true;
+            return { ...ver, status: 'approved', isCurrentActive: true };
+          }
+          if (ver.id === versionId) {
+             return { ...ver, status: status, isCurrentActive: false };
+          }
+          return ver;
+        });
+
+        // If a new active version was set, unset all others
+        if (isNewActiveVersion) {
+          return {
+            ...v,
+            versions: newVersions.map(ver => {
+              if(ver.id !== versionId) {
+                return { ...ver, isCurrentActive: false };
+              }
+              return ver;
+            })
+          };
+        } else {
+          return { ...v, versions: newVersions };
+        }
+      }
+      return v;
+    });
+    
+    setVideos(updatedVideos);
+    toast({
+      title: '版本狀態已更新',
+    });
+  }, [video, videos, toast]);
+
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -132,6 +175,7 @@ export default function VideoPage() {
                         onTimecodeClick={handleTimecodeClick} 
                         currentTimeFormatted={formatTime(currentTime)}
                         onAddComment={handleAddComment}
+                        onVersionStatusChange={handleVersionStatusChange}
                     />
                 </div>
             </main>
