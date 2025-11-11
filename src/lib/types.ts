@@ -74,4 +74,7 @@ export type Video = {
   uploadedAt: string;
   versions: Version[];
   videoUrl: string; // The URL of the currently active video version for quick access
+  assignedUserIds: string[];
+  isDeleted?: boolean;
+  deletedAt?: string;
 };

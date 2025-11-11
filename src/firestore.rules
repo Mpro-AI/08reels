@@ -16,12 +16,26 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    function isCommentAuthor(comment) {
-      return isOwner(comment.author.id);
+    // Check if user has access to a specific video
+    function hasVideoAccess(videoData) {
+      // Admins have access to everything
+      if (isAdmin()) {
+        return true;
+      }
+      // The author of the video always has access
+      if (isOwner(videoData.author.id)) {
+        return true;
+      }
+      // If assignedUserIds is not present or is empty, it's a public video
+      if (!('assignedUserIds' in videoData) || videoData.assignedUserIds.size() == 0) {
+        return true;
+      }
+      // If the user's ID is in the assignedUserIds list
+      return request.auth.uid in videoData.assignedUserIds;
     }
-    
-    // Check if the only modification to a video document is adding or removing a comment
-    function isModifyingComments(request, resource) {
+
+    // Check if the only modification to a video document is adding or removing a comment/annotation
+    function isModifyingOnlySubcollections(request, resource) {
       let isChangingVersions = request.resource.data.diff(resource.data).affectedKeys().hasOnly(['versions']);
       if (!isChangingVersions) {
         return false;
@@ -32,21 +46,22 @@ service cloud.firestore {
                                  request.resource.data.author.id == resource.data.author.id &&
                                  request.resource.data.thumbnailUrl == resource.data.thumbnailUrl &&
                                  request.resource.data.thumbnailHint == resource.data.thumbnailHint &&
-                                 request.resource.data.uploadedAt == resource.data.uploadedAt;
+                                 request.resource.data.uploadedAt == resource.data.uploadedAt &&
+                                 request.resource.data.assignedUserIds == resource.data.assignedUserIds &&
+                                 request.resource.data.isDeleted == resource.data.isDeleted;
+
       if (!otherFieldsUnchanged) {
         return false;
       }
       
-      // Now, deeply check versions to ensure only comments changed
+      // Now, deeply check versions to ensure only comments or annotations changed
       let oldVersions = resource.data.versions;
       let newVersions = request.resource.data.versions;
       
-      // Must have same number of versions
       if (oldVersions.size() != newVersions.size()) {
         return false;
       }
       
-      // Iterate through versions and check that only comments are different
       let versionIndices = toInt(oldVersions.size()).sequence();
       return versionIndices.all(i => 
         (oldVersions[i].id == newVersions[i].id) &&
@@ -55,38 +70,28 @@ service cloud.firestore {
         (oldVersions[i].uploader.id == newVersions[i].uploader.id) &&
         (oldVersions[i].isCurrentActive == newVersions[i].isCurrentActive) &&
         (oldVersions[i].videoUrl == newVersions[i].videoUrl) &&
-        (oldVersions[i].notes == newVersions[i].notes) &&
-        // comments can be different
-        (oldVersions[i].annotations.size() == newVersions[i].annotations.size())
+        (oldVersions[i].notes == newVersions[i].notes)
       );
     }
 
     // ========== Collections ==========
 
-    // Users can read other user profiles (for assign-to dropdown)
-    // and can only write to their own user profile document.
     match /users/{userId} {
-      allow read: if isAdmin() || isSignedIn();
+      allow read: if isSignedIn();
       allow write: if isAdmin() || isOwner(userId);
     }
 
-    // Videos can be listed and read by any signed-in user.
-    // Creation is allowed if the author is the current user.
-    // Updates are allowed only by the video's author or admin.
     match /videos/{videoId} {
-      allow get, list: if isAdmin() || isSignedIn();
-      
-      allow create: if isAdmin() || (isSignedIn()
-                    && request.resource.data.author.id == request.auth.uid
-                    && request.resource.data.title is string
-                    && request.resource.data.thumbnailUrl is string
-                    && 'uploadedAt' in request.resource.data);
+      // `list` is tricky. We allow any signed-in user to list, but the client-side
+      // query must enforce the actual filtering. The `get` rule provides the real security.
+      allow list: if isSignedIn();
 
-      // Allow updates if the user is an admin, the author of the video,
-      // or if any signed-in user is just adding/deleting a comment.
-      allow update: if isAdmin() || 
-                     isOwner(resource.data.author.id) ||
-                     (isSignedIn() && isModifyingComments(request, resource));
+      allow get: if isSignedIn() && hasVideoAccess(resource.data);
+      
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.author.id == request.auth.uid);
+
+      allow update: if isAdmin() || isOwner(resource.data.author.id) || 
+                     (isSignedIn() && hasVideoAccess(resource.data) && isModifyingOnlySubcollections(request, resource));
       
       allow delete: if isAdmin() || isOwner(resource.data.author.id);
     }

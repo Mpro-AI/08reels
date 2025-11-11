@@ -2,10 +2,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Video, VersionStatus } from '@/lib/types';
+import { Video, VersionStatus, User } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Clock, User, GitBranch } from 'lucide-react';
+import { Clock, User as UserIcon, GitBranch, Users, MoreVertical, Settings } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Button } from '../ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { useState } from 'react';
+import { ManageVideoDialog } from '../video/manage-video-dialog';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   approved: { text: '已核可', variant: 'default' },
@@ -14,48 +19,100 @@ const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'sec
   rejected: { text: '已拒絕', variant: 'destructive' },
 };
 
-export default function VideoCard({ video }: { video: Video }) {
+export default function VideoCard({ video, onVideoDeleted }: { video: Video; onVideoDeleted: (videoId: string) => void; }) {
+  const { user } = useAuth();
+  const [showManageDialog, setShowManageDialog] = useState(false);
   const latestVersion = video.versions.length > 0 ? [...video.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] : null;
   const statusInfo = latestVersion ? statusMap[latestVersion.status] : null;
 
+  const canManage = user?.role === 'admin' || user?.id === video.author.id;
+  const hasAssignedUsers = video.assignedUserIds && video.assignedUserIds.length > 0;
+  const assignedCount = video.assignedUserIds?.length || 0;
+
+  const handleDeleted = (videoId: string) => {
+    onVideoDeleted(videoId);
+    setShowManageDialog(false);
+  }
+
   return (
-    <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1">
-      <Link href={`/videos/${video.id}`} className="block">
-        <div className="aspect-video overflow-hidden">
-          <Image
-            src={video.thumbnailUrl}
-            alt={video.title}
-            width={400}
-            height={225}
-            className="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
-            data-ai-hint={video.thumbnailHint}
-          />
-        </div>
-      </Link>
-      <CardHeader className="flex-grow">
+    <>
+      <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 relative group">
         <Link href={`/videos/${video.id}`} className="block">
-          <CardTitle className="text-lg font-headline hover:text-primary">{video.title}</CardTitle>
+          <div className="aspect-video overflow-hidden">
+            <Image
+              src={video.thumbnailUrl}
+              alt={video.title}
+              width={400}
+              height={225}
+              className="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
+              data-ai-hint={video.thumbnailHint}
+            />
+          </div>
         </Link>
-      </CardHeader>
-      <CardContent className="text-sm text-muted-foreground space-y-2">
-         {latestVersion && statusInfo && (
-            <div className="flex items-center gap-2">
-              <GitBranch className="size-4"/> 
-              <span>最新版本 v{latestVersion.versionNumber.toString().padStart(2, '0')}</span>
-              <Badge variant={statusInfo.variant} className="ml-auto">{statusInfo.text}</Badge>
-            </div>
-         )}
-         <div className="flex items-center gap-2">
-            <User className="size-4"/>
-            <span>作者：{video.author.name}</span>
-         </div>
-      </CardContent>
-      <CardFooter className="text-xs text-muted-foreground">
-        <div className="flex items-center gap-1">
-            <Clock className="size-3"/>
-            <span>上傳於 {formatDistanceToNow(new Date(video.uploadedAt), { addSuffix: true, locale: zhTW })}</span>
-        </div>
-      </CardFooter>
-    </Card>
+
+        {hasAssignedUsers && (
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+            <Users className="h-3 w-3" />
+            <span>{assignedCount}</span>
+          </div>
+        )}
+        
+        <CardHeader className="flex-grow">
+          <div className='flex items-start justify-between gap-2'>
+            <Link href={`/videos/${video.id}`} className="block flex-1">
+              <CardTitle className="text-lg font-headline hover:text-primary">{video.title}</CardTitle>
+            </Link>
+            {canManage && (
+               <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowManageDialog(true)}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      管理專案
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+           {latestVersion && statusInfo && (
+              <div className="flex items-center gap-2">
+                <GitBranch className="size-4"/> 
+                <span>最新版本 v{latestVersion.versionNumber.toString().padStart(2, '0')}</span>
+                <Badge variant={statusInfo.variant} className="ml-auto">{statusInfo.text}</Badge>
+              </div>
+           )}
+           <div className="flex items-center gap-2">
+              <UserIcon className="size-4"/>
+              <span>作者：{video.author.name}</span>
+           </div>
+           {hasAssignedUsers && (
+             <div className="flex items-center gap-2">
+                <Users className="size-4"/>
+                <span>指派給 {assignedCount} 位用戶</span>
+             </div>
+           )}
+        </CardContent>
+        <CardFooter className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+              <Clock className="size-3"/>
+              <span>上傳於 {formatDistanceToNow(new Date(video.uploadedAt), { addSuffix: true, locale: zhTW })}</span>
+          </div>
+        </CardFooter>
+      </Card>
+      {canManage && (
+        <ManageVideoDialog 
+          isOpen={showManageDialog}
+          onOpenChange={setShowManageDialog}
+          video={video}
+          onVideoDeleted={handleDeleted}
+        />
+      )}
+    </>
   );
 }

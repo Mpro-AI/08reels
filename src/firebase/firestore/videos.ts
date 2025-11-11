@@ -30,6 +30,41 @@ export function setVideo(
   });
 }
 
+export function updateVideoAssignedUsers(
+    db: Firestore,
+    videoId: string,
+    assignedUserIds: string[]
+) {
+    const videoRef = doc(db, 'videos', videoId);
+    updateDoc(videoRef, { assignedUserIds }).catch((e) => {
+        const permissionError = new FirestorePermissionError({
+            path: videoRef.path,
+            operation: 'update',
+            requestResourceData: { assignedUserIds },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+}
+
+export function deleteVideo(
+    db: Firestore,
+    videoId: string
+) {
+    const videoRef = doc(db, 'videos', videoId);
+    updateDoc(videoRef, { 
+      isDeleted: true,
+      deletedAt: Timestamp.now().toDate().toISOString()
+    }).catch((e) => {
+        const permissionError = new FirestorePermissionError({
+            path: videoRef.path,
+            operation: 'update',
+            requestResourceData: { isDeleted: true },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+}
+
+
 export function addAnnotationsToVersion(
   db: Firestore,
   videoId: string,
@@ -236,7 +271,7 @@ export function setVersionStatus(
 export async function addVideo(
     db: Firestore,
     videoId: string,
-    newVideoData: { title: string; videoUrl: string; thumbnailUrl?: string; notes?: string },
+    newVideoData: { title: string; videoUrl: string; thumbnailUrl?: string; notes?: string; assignedUserIds?: string[]; },
     author: Pick<User, 'id' | 'name'>
 ) {
     const videoRef = doc(db, 'videos', videoId);
@@ -262,6 +297,8 @@ export async function addVideo(
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
             videoUrl: newVideoData.videoUrl,
+            assignedUserIds: newVideoData.assignedUserIds || [],
+            isDeleted: false,
         };
 
         await setDoc(videoRef, newVideo);

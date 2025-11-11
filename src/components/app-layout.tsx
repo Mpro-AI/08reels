@@ -9,25 +9,27 @@ import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore'; // 加入 orderBy
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {
   videos: Video[] | null;
   loading: boolean;
+  allUsers: User[] | null;
 }
 
 export const AppLayoutContext = createContext<AppLayoutContextType>({
   videos: null,
   loading: true,
+  allUsers: null,
 });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, logout, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const firestore = useFirestore();
-  
+
   const videosQuery = useMemo(() => {
     if (!firestore || !isAuthenticated) return null;
     return query(
@@ -38,15 +40,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: videos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
   
+  const usersQuery = useMemo(() => {
+    if (!firestore || !isAuthenticated) return null;
+    return collection(firestore, 'users');
+  }, [firestore, isAuthenticated]);
+  const { data: allUsers } = useCollection<User>(usersQuery);
+
+  const filteredVideos = useMemo(() => {
+    if (!videos || !user) return [];
+    if (user.role === 'admin') {
+      return videos.filter(v => !v.isDeleted);
+    }
+    return videos.filter(v => {
+      if (v.isDeleted) return false;
+      const isAuthor = v.author.id === user.id;
+      const isAssigned = v.assignedUserIds?.includes(user.id);
+      const isPublic = !v.assignedUserIds || v.assignedUserIds.length === 0;
+      return isAuthor || isAssigned || isPublic;
+    });
+  }, [videos, user]);
+  
+
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🎬 Videos loading:', videosLoading);
       console.log('🎬 Videos data:', videos);
+      console.log('🎬 Filtered videos data:', filteredVideos);
       console.log('🎬 Videos error:', error);
       console.log('🎬 Firestore:', firestore ? 'Connected' : 'Not connected');
       console.log('🎬 Authenticated:', isAuthenticated);
+      console.log('👤 Current user:', user);
     }
-  }, [videos, videosLoading, error, firestore, isAuthenticated]);
+  }, [videos, filteredVideos, videosLoading, error, firestore, isAuthenticated, user]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -54,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, isAuthenticated, router, pathname]);
 
-  if (authLoading || (!isAuthenticated && pathname !== '/login')) {
+  if (authLoading || !isAuthenticated) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -66,7 +91,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <AppLayoutContext.Provider value={{ videos: videos, loading: videosLoading }}>
+    <AppLayoutContext.Provider value={{ videos: filteredVideos, loading: videosLoading, allUsers }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
@@ -86,11 +111,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenu>
               <SidebarMenu className="mt-4">
                   <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                    專案列表 {videos && videos.length > 0 && `(${videos.length})`}
+                    專案列表 {filteredVideos && filteredVideos.length > 0 && `(${filteredVideos.length})`}
                   </p>
                   
-                  {/* 載入中狀態 */}
-                  {videosLoading && Array.from({ length: 3 }).map((_, i) => (
+                  {videosLoading && !videos && Array.from({ length: 3 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <div className="flex items-center gap-2 p-2">
                         <Skeleton className="size-4" />
@@ -99,17 +123,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </SidebarMenuItem>
                   ))}
                   
-                  {/* 錯誤狀態 */}
                   {error && (
                     <SidebarMenuItem>
                       <div className="px-4 py-2 text-xs text-destructive">
-                        載入失敗
+                        載入失敗: {error.message}
                       </div>
                     </SidebarMenuItem>
                   )}
                   
-                  {/* 空狀態 */}
-                  {!videosLoading && !error && videos?.length === 0 && (
+                  {!videosLoading && filteredVideos?.length === 0 && (
                     <SidebarMenuItem>
                       <div className="px-4 py-2 text-xs text-muted-foreground">
                         尚無影片專案
@@ -117,8 +139,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </SidebarMenuItem>
                   )}
                   
-                  {/* 影片列表 */}
-                  {videos?.map(video => (
+                  {filteredVideos?.map(video => (
                       <SidebarMenuItem key={video.id}>
                           <SidebarMenuButton asChild tooltip={video.title} isActive={pathname.startsWith(`/videos/${video.id}`)}>
                               <Link href={`/videos/${video.id}`}>
