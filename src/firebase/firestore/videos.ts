@@ -168,10 +168,11 @@ export async function addVersionToVideo(
 
 export async function addVideo(
     db: Firestore,
+    videoId: string,
     newVideoData: { title: string; videoUrl: string, assignedTo: Pick<User, 'id' | 'name'>, notes?: string },
     uploader: Pick<User, 'id' | 'name'>
 ) {
-    const videoRef = doc(collection(db, 'videos'));
+    const videoRef = doc(db, 'videos', videoId);
     try {
         const firstVersion: Version = {
             id: doc(collection(db, 'videos')).id,

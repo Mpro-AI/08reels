@@ -97,7 +97,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
     try {
         const videoFile = data.videoFile[0];
 
-        const videoUrl = await uploadVideoAndGetUrl(
+        const { downloadURL, videoId: newVideoId } = await uploadVideoAndGetUrl(
           storage, 
           videoFile, 
           setUploadProgress,
@@ -106,7 +106,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
 
         if (video) {
             // Add new version to existing video
-            await addVersionToVideo(firestore, video.id, videoUrl, { id: user.id, name: user.name }, data.notes);
+            await addVersionToVideo(firestore, video.id, downloadURL, { id: user.id, name: user.name }, data.notes);
             toast({ title: '成功', description: '新版本已成功提交。' });
         } else {
             // Create a new video project
@@ -125,11 +125,11 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
 
             const newVideoData = {
                 title: data.title,
-                videoUrl: videoUrl,
+                videoUrl: downloadURL,
                 assignedTo: { id: assignedUser.id, name: assignedUser.name },
                 notes: data.notes,
             };
-            await addVideo(firestore, newVideoData, { id: user.id, name: user.name });
+            await addVideo(firestore, newVideoId, newVideoData, { id: user.id, name: user.name });
             toast({ title: '成功', description: '新影片專案已成功建立。' });
         }
         handleClose();

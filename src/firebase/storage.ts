@@ -12,15 +12,15 @@ import { v4 as uuidv4 } from 'uuid';
  * @param storage The Firebase Storage instance.
  * @param file The video file to upload.
  * @param onProgress A callback function to track upload progress (0-100).
- * @param videoId The ID of the video project (optional, for organizing versions).
- * @returns A promise that resolves with the public download URL of the uploaded video.
+ * @param videoId The ID of the video project (optional, for organizing versions). If not provided, a new one is generated.
+ * @returns A promise that resolves with the public download URL and the videoId used.
  */
 export async function uploadVideoAndGetUrl(
   storage: FirebaseStorage,
   file: File,
   onProgress: (progress: number) => void,
   videoId?: string
-): Promise<string> {
+): Promise<{ downloadURL: string; videoId: string }> {
   const videoProjectId = videoId || uuidv4();
   const versionId = uuidv4();
   const storagePath = `videos/${videoProjectId}/versions/${versionId}/${file.name}`;
@@ -43,7 +43,7 @@ export async function uploadVideoAndGetUrl(
       async () => {
         onProgress(100);
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(downloadURL);
+        resolve({ downloadURL, videoId: videoProjectId });
       }
     );
   });
