@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, createContext } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Film, LogOut, Home } from 'lucide-react';
 import { Icons } from '@/components/icons';
@@ -94,12 +94,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   ))}
               </SidebarMenu>
           </SidebarContent>
-          <div className="p-4 mt-auto">
+          <SidebarFooter>
                <Button variant="ghost" className="w-full justify-start gap-2 p-2 group-data-[collapsible=icon]:justify-center" onClick={() => logout()}>
                   <LogOut className="size-4 shrink-0" />
                   <span className="group-data-[collapsible=icon]:hidden">登出</span>
                </Button>
-          </div>
+          </SidebarFooter>
         </Sidebar>
         <div className="flex-1 flex flex-col min-h-screen ml-[3rem] group-data-[state=expanded]/sidebar-wrapper:ml-[16rem] transition-[margin-left] duration-200">
           {children}
