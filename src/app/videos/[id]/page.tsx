@@ -112,11 +112,8 @@ export default function VideoPage() {
                 <Header title="載入中..." />
                 <main className="flex-1 p-8 grid grid-cols-3 gap-8">
                     <div className="col-span-2 space-y-4">
-                        <Skeleton className="w-full aspect-video" />
                     </div>
                     <div className="col-span-1 space-y-4">
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-64 w-full" />
                     </div>
                 </main>
             </div>

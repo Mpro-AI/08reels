@@ -9,7 +9,7 @@ import { Video } from '@/lib/types';
 export default function DashboardPage() {
   const { videos, loading } = useContext(AppLayoutContext);
 
-  if (loading && !videos) {
+  if (loading) {
     return (
       <AppLayout>
         <div className="flex flex-1 flex-col">
