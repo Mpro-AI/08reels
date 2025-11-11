@@ -20,17 +20,15 @@ const mockUsers: User[] = [
     { id: 'user-employee-b', name: '員工 B', role: 'employee', pin: '9564' },
 ];
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
+const getInitialUser = () => {
     // Automatically log in as admin for developer mode
     const adminUser = mockUsers.find(u => u.role === 'admin');
-    if (adminUser) {
-      setUser(adminUser);
-    }
-  }, []);
+    return adminUser || null;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(getInitialUser);
+  const { toast } = useToast();
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
     const foundUser = mockUsers.find(u => u.pin === pin);
