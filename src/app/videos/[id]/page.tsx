@@ -1,7 +1,6 @@
 'use client';
 import { useParams } from 'next/navigation';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
@@ -15,6 +14,7 @@ import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
 import TextAnnotationInput from '@/components/video/text-annotation-input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -345,13 +345,21 @@ export default function VideoPage() {
   
   if (loading || !video || !selectedVersion) {
     return (
-        <AppLayout>
-            <div className="flex flex-1 flex-col">
-                <Header title="載入中..." />
-                <main className="flex-1 p-8 grid grid-cols-3 gap-8">
-                </main>
-            </div>
-        </AppLayout>
+        <>
+            <Header title="載入中..." />
+            <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
+                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
+                    <Skeleton className="w-full aspect-video" />
+                 </div>
+                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
+                    <div className="p-4 space-y-4">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-64 w-full" />
+                    </div>
+                 </div>
+            </main>
+        </>
     );
   }
 
@@ -359,75 +367,78 @@ export default function VideoPage() {
   const visibleAnnotations = allAnnotations.filter(a => currentTime >= a.timecode && currentTime < a.timecode + 0.5);
 
   return (
-    <AppLayout>
-        <div className="flex flex-1 flex-col h-screen overflow-hidden">
-            <Header title={video.title} />
-            <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
-                <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
-                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating || isTextAnnotating} />
-                    {isAnnotating && (annotationMode === 'pen' || annotationMode === 'select') && (
-                      <div className="absolute top-4 z-20 flex w-full justify-center">
-                         <AnnotationToolbar
-                            mode={annotationMode}
-                            onModeChange={setAnnotationMode}
-                            color={penColor}
-                            onColorChange={setPenColor}
-                            lineWidth={penLineWidth}
-                            onLineWidthChange={setPenLineWidth}
-                            onSave={handleSaveAnnotations}
-                            onExit={exitAnnotationMode}
-                            isSavingDisabled={newAnnotations.length === 0}
-                            isUploading={isUploading}
-                          />
-                      </div>
-                    )}
-                    {isTextAnnotating && textAnnotationCoords && (
-                        <TextAnnotationInput
-                            x={textAnnotationCoords.x}
-                            y={textAnnotationCoords.y}
-                            onComplete={handleCompleteTextAnnotation}
-                            onCancel={() => {
-                                setIsTextAnnotating(false);
-                                setTextAnnotationCoords(null);
-                                setIsAnnotating(false);
-                                setAnnotationMode('select');
-                            }}
-                        />
-                    )}
-                    <AnnotationCanvas 
-                      width={playerRef.current?.clientWidth || 0}
-                      height={playerRef.current?.clientHeight || 0}
-                      annotations={visibleAnnotations}
-                      onAddAnnotation={handleAddAnnotation}
-                      onUpdateAnnotation={handleUpdateAnnotation}
-                      onEnterTextMode={handleEnterTextMode}
-                      annotationMode={annotationMode}
-                      penColor={penColor}
-                      penLineWidth={penLineWidth}
-                      isAnnotating={isAnnotating && !isTextAnnotating}
+    <>
+        <Header title={video.title} />
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
+            <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
+                <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating || isTextAnnotating} />
+                {isAnnotating && (annotationMode === 'pen' || annotationMode === 'select' || annotationMode === 'text') && (
+                  <div className="absolute top-4 z-20 flex w-full justify-center">
+                     <AnnotationToolbar
+                        mode={annotationMode}
+                        onModeChange={(mode) => {
+                            setAnnotationMode(mode)
+                            if (mode === 'image') {
+                                imageAnnotationInputRef.current?.click();
+                            }
+                        }}
+                        color={penColor}
+                        onColorChange={setPenColor}
+                        lineWidth={penLineWidth}
+                        onLineWidthChange={setPenLineWidth}
+                        onSave={handleSaveAnnotations}
+                        onExit={exitAnnotationMode}
+                        isSavingDisabled={newAnnotations.length === 0}
+                        isUploading={isUploading}
+                      />
+                  </div>
+                )}
+                {isTextAnnotating && textAnnotationCoords && (
+                    <TextAnnotationInput
+                        x={textAnnotationCoords.x}
+                        y={textAnnotationCoords.y}
+                        onComplete={handleCompleteTextAnnotation}
+                        onCancel={() => {
+                            setIsTextAnnotating(false);
+                            setTextAnnotationCoords(null);
+                            setIsAnnotating(false);
+                            setAnnotationMode('select');
+                        }}
                     />
-                    <input 
-                      type="file" 
-                      ref={imageAnnotationInputRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageFileChange}
-                    />
-                </div>
-                <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
-                    <SidePanel 
-                        video={video}
-                        selectedVersion={selectedVersion}
-                        onVersionChange={setSelectedVersionId}
-                        onTimecodeClick={handleTimecodeClick} 
-                        onAnnotationClick={handleAnnotationClick}
-                        currentTimeFormatted={formatTime(currentTime)}
-                        onDeleteComment={handleDeleteComment}
-                        onVersionStatusChange={handleVersionStatusChange}
-                    />
-                </div>
-            </main>
-        </div>
-    </AppLayout>
+                )}
+                <AnnotationCanvas 
+                  width={playerRef.current?.clientWidth || 0}
+                  height={playerRef.current?.clientHeight || 0}
+                  annotations={visibleAnnotations}
+                  onAddAnnotation={handleAddAnnotation}
+                  onUpdateAnnotation={handleUpdateAnnotation}
+                  onEnterTextMode={handleEnterTextMode}
+                  annotationMode={annotationMode}
+                  penColor={penColor}
+                  penLineWidth={penLineWidth}
+                  isAnnotating={isAnnotating && !isTextAnnotating}
+                />
+                <input 
+                  type="file" 
+                  ref={imageAnnotationInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                />
+            </div>
+            <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
+                <SidePanel 
+                    video={video}
+                    selectedVersion={selectedVersion}
+                    onVersionChange={setSelectedVersionId}
+                    onTimecodeClick={handleTimecodeClick} 
+                    onAnnotationClick={handleAnnotationClick}
+                    currentTimeFormatted={formatTime(currentTime)}
+                    onDeleteComment={handleDeleteComment}
+                    onVersionStatusChange={handleVersionStatusChange}
+                />
+            </div>
+        </main>
+    </>
   );
 }

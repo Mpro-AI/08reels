@@ -1,6 +1,6 @@
 'use client';
 
-import { Pen, MousePointer2, Save, X, Loader2, Type } from 'lucide-react';
+import { Pen, MousePointer2, Save, X, Loader2, Type, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -43,6 +43,12 @@ export default function AnnotationToolbar({
         </ToggleGroupItem>
         <ToggleGroupItem value="pen" aria-label="Pen tool">
           <Pen className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="text" aria-label="Text tool">
+          <Type className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="image" aria-label="Image tool">
+            <ImageIcon className="h-4 w-4" />
         </ToggleGroupItem>
       </ToggleGroup>
       

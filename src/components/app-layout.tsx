@@ -26,12 +26,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
   const firestore = useFirestore();
   
   const videosQuery = useMemo(() => {
-    if (!firestore || !isAuthenticated) return null; // Wait for auth and firestore
-    // 加入排序,確保查詢正確
+    if (!firestore || !isAuthenticated) return null;
     return query(
       collection(firestore, 'videos'),
       orderBy('uploadedAt', 'desc')
@@ -40,7 +38,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: videos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
   
-  // 加入調試日誌
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🎬 Videos loading:', videosLoading);
