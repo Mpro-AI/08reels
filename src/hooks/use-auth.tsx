@@ -1,11 +1,12 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  loading: boolean;
   login: (pin: string) => Promise<boolean>;
   logout: () => void;
   setUserRole: (role: UserRole) => void;
@@ -21,25 +22,36 @@ const mockUsers: User[] = [
 ];
 
 const getInitialUser = () => {
+    if (typeof window === 'undefined') return null;
     // Automatically log in as admin for developer mode
     const adminUser = mockUsers.find(u => u.role === 'admin');
     return adminUser || null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(getInitialUser);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // This effect now only runs once on mount to set the initial user
+    setUser(getInitialUser());
+    setLoading(false);
+  }, []);
+  
   const isAuthenticated = !!user;
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
     const foundUser = mockUsers.find(u => u.pin === pin);
     
     if (foundUser) {
+      setLoading(true);
       setUser(foundUser);
       toast({
         title: `歡迎， ${foundUser.name}`,
         description: `您已成功以 ${foundUser.role} 身份登入。`,
       });
+      setLoading(false);
       return true;
     } else {
       toast({
@@ -52,24 +64,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [toast]);
 
   const logout = useCallback(() => {
+    setLoading(true);
     setUser(null);
     toast({
       title: '已登出',
       description: '您已成功登出。',
     });
+    // A small delay to allow state to update before redirect happens
+    setTimeout(() => setLoading(false), 50);
   }, [toast]);
   
   const setUserRole = useCallback((role: UserRole) => {
     const foundUser = mockUsers.find(u => u.role === role);
     if (foundUser) {
+        setLoading(true);
         setUser(foundUser);
+        setLoading(false);
     } else {
         console.warn(`No mock user found for role: ${role}`);
     }
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUserRole }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout, setUserRole }}>
       {children}
     </AuthContext.Provider>
   );

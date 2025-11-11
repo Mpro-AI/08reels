@@ -23,7 +23,7 @@ export const AppLayoutContext = createContext<AppLayoutContextType>({
 });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -33,28 +33,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return collection(firestore, 'videos');
   }, [firestore, isAuthenticated]);
 
-  const { data: videos, loading } = useCollection<Video>(videosQuery);
+  const { data: videos, loading: videosLoading } = useCollection<Video>(videosQuery);
 
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push(`/login?redirect=${pathname}`);
     }
-  }, [isAuthenticated, router, pathname]);
+  }, [authLoading, isAuthenticated, router, pathname]);
 
-  if (!isAuthenticated) {
+  if (authLoading || !isAuthenticated) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="space-y-4 p-8">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-96 w-full" />
+        <div className="flex flex-col items-center gap-4">
+          <Icons.logo className="h-12 w-12 animate-pulse text-primary" />
+          <p className="text-muted-foreground">載入中...</p>
         </div>
       </div>
     );
   }
   
   return (
-    <AppLayoutContext.Provider value={{ videos, loading }}>
+    <AppLayoutContext.Provider value={{ videos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
@@ -74,7 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenu>
               <SidebarMenu className="mt-4">
                   <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">專案列表</p>
-                  {loading && Array.from({ length: 3 }).map((_, i) => (
+                  {videosLoading && Array.from({ length: 3 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <div className="flex items-center gap-2 p-2">
                         <Skeleton className="size-4" />
