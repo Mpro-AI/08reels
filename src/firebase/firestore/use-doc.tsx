@@ -13,7 +13,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 export function useDoc<T>(
   ref: DocumentReference | null
-): { data: T | null; loading: boolean; error: FirestoreError | null } {
+): { data: T | null; loading: boolean; error: FirestoreError | null; setData: (data: T) => void } {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | null>(null);
@@ -48,5 +48,5 @@ export function useDoc<T>(
     return () => unsubscribe();
   }, [ref]);
 
-  return { data, loading, error };
+  return { data, loading, error, setData };
 }

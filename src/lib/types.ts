@@ -27,6 +27,7 @@ export type ImageAnnotationData = {
   y: number;
   width: number;
   height: number;
+  rotation: number; // in radians
 };
 
 export type Annotation = {

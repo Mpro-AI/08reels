@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion, addAnnotationsToVersion } from '@/firebase/firestore/videos';
+import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion, addAnnotationsToVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
 import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export default function VideoPage() {
     return doc(firestore, 'videos', videoId);
   }, [firestore, videoId]);
 
-  const { data: video, loading } = useDoc<Video>(videoRef);
+  const { data: video, loading, setData: setVideo } = useDoc<Video>(videoRef);
   
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
   const playerRef = useRef<HTMLVideoElement>(null);
@@ -165,22 +165,29 @@ export default function VideoPage() {
       try {
         const imageUrl = await uploadAnnotationImage(storage!, imageAnnotationFile, videoId, selectedVersionId!);
         
-        // Define a fixed size for the placed image for now
         const imageWidth = 200; 
-        const imageHeight = (imageWidth / (imageAnnotationFile.type.includes('w') ? 16 : 9)) * 9;
+        const tempImage = new Image();
+        tempImage.src = URL.createObjectURL(imageAnnotationFile);
+        tempImage.onload = () => {
+          const aspectRatio = tempImage.width / tempImage.height;
+          const imageHeight = imageWidth / aspectRatio;
 
-
-        newAnnotation = {
-          type: 'image',
-          data: {
-            url: imageUrl,
-            x: data.x,
-            y: data.y,
-            width: imageWidth,
-            height: imageHeight,
-          } as ImageAnnotationData,
-          ...commonData,
+          const imageAnnotation: Omit<Annotation, 'id'> = {
+            type: 'image',
+            data: {
+              url: imageUrl,
+              x: data.x - imageWidth / 2, // Center the image on the click
+              y: data.y - imageHeight / 2,
+              width: imageWidth,
+              height: imageHeight,
+              rotation: 0,
+            } as ImageAnnotationData,
+            ...commonData,
+          };
+           setNewAnnotations(prev => [...prev, { ...imageAnnotation, id: `new-${Date.now()}` } as Annotation]);
+           URL.revokeObjectURL(tempImage.src);
         };
+        
       } catch (error) {
         toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
         console.error(error);
@@ -192,8 +199,32 @@ export default function VideoPage() {
     }
     
     if (newAnnotation) {
-      // The `id` will be generated within the firestore function
-      setNewAnnotations(prev => [...prev, { ...newAnnotation, id: '' }]);
+      setNewAnnotations(prev => [...prev, { ...newAnnotation, id: `new-${Date.now()}` } as Annotation]);
+    }
+  };
+
+  const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {
+    // Check if it's a new, unsaved annotation
+    if (updatedAnnotation.id.startsWith('new-')) {
+        setNewAnnotations(prev => prev.map(a => a.id === updatedAnnotation.id ? updatedAnnotation : a));
+    } else {
+        // It's an existing annotation, update in Firestore and local state
+        if (!firestore || !video || !selectedVersionId) return;
+
+        updateAnnotationInVersion(firestore, video.id, selectedVersionId, updatedAnnotation);
+        
+        // Optimistically update local state for immediate feedback
+        if (setVideo) {
+            const updatedVideo = { ...video };
+            const versionIndex = updatedVideo.versions.findIndex(v => v.id === selectedVersionId);
+            if (versionIndex > -1) {
+                const annotationIndex = updatedVideo.versions[versionIndex].annotations.findIndex(a => a.id === updatedAnnotation.id);
+                if (annotationIndex > -1) {
+                    updatedVideo.versions[versionIndex].annotations[annotationIndex] = updatedAnnotation;
+                    setVideo(updatedVideo);
+                }
+            }
+        }
     }
   };
 
@@ -248,7 +279,7 @@ export default function VideoPage() {
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
                     <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating} />
-                    {(isAnnotating || isUploading) && (
+                    {(isAnnotating || newAnnotations.length > 0) && (
                       <div className="absolute top-4 right-4 z-20 flex gap-2">
                         {isUploading ? (
                           <Button variant="outline" size="icon" disabled>
@@ -271,7 +302,9 @@ export default function VideoPage() {
                       height={playerRef.current?.clientHeight || 0}
                       annotations={visibleAnnotations}
                       onAddAnnotation={handleAddAnnotation}
+                      onUpdateAnnotation={handleUpdateAnnotation}
                       annotationMode={annotationMode}
+                      isAnnotating={isAnnotating}
                     />
                     <input 
                       type="file" 

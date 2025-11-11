@@ -72,6 +72,45 @@ export function addAnnotationsToVersion(
     });
 }
 
+export function updateAnnotationInVersion(
+    db: Firestore,
+    videoId: string,
+    versionId: string,
+    updatedAnnotation: Annotation,
+) {
+    const videoRef = doc(db, 'videos', videoId);
+    runTransaction(db, async (transaction) => {
+        const videoDoc = await transaction.get(videoRef);
+        if (!videoDoc.exists()) {
+            throw 'Video does not exist!';
+        }
+
+        const video = videoDoc.data() as Video;
+        const versionIndex = video.versions.findIndex((v) => v.id === versionId);
+        if (versionIndex === -1) {
+            throw 'Version does not exist!';
+        }
+
+        const newVersions = [...video.versions];
+        const annotationIndex = newVersions[versionIndex].annotations.findIndex(a => a.id === updatedAnnotation.id);
+        if (annotationIndex === -1) {
+            throw 'Annotation does not exist!';
+        }
+        
+        newVersions[versionIndex].annotations[annotationIndex] = updatedAnnotation;
+
+        transaction.update(videoRef, { versions: newVersions });
+    }).catch((e) => {
+        console.error("Transaction for updating annotation failed: ", e);
+        const permissionError = new FirestorePermissionError({
+            path: videoRef.path,
+            operation: 'update',
+            requestResourceData: { updatedAnnotation },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+}
+
 
 export function addCommentToVersion(
   db: Firestore,
