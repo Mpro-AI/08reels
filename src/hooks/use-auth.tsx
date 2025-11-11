@@ -23,79 +23,40 @@ const initialUsers: Omit<User, 'id'>[] = [
     { name: '員工 B', role: 'employee', pin: '9564' },
 ];
 
+const adminUserForTesting: User = {
+  id: 'admin-test-id',
+  name: 'Admin User',
+  role: 'admin',
+  pin: '2652'
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
   const firestore = useFirestore();
 
   useEffect(() => {
-    const seedInitialUsers = async () => {
-        if (!firestore) return;
-        const usersCollection = collection(firestore, 'users');
-        const snapshot = await getDocs(usersCollection);
-        if (snapshot.empty) {
-            console.log('No users found, seeding initial data...');
-            const batch = writeBatch(firestore);
-            initialUsers.forEach(userData => {
-                const userRef = doc(usersCollection);
-                batch.set(userRef, userData);
-            });
-            await batch.commit();
-            console.log('Initial users seeded.');
-        } else {
-            console.log('Users collection is not empty.');
-        }
-    };
-    seedInitialUsers().catch(console.error);
-  }, [firestore]);
+    // Set user to admin for UI testing
+    setUser(adminUserForTesting);
+  }, []);
 
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
-    if (!firestore) {
-        toast({
-            variant: "destructive",
-            title: "登入錯誤",
-            description: "資料庫連線失敗，請稍後再試。",
-        });
-        return false;
-    }
-
-    const pinQuery = query(collection(firestore, "users"), where("pin", "==", pin));
-
-    try {
-      const querySnapshot = await getDocs(pinQuery);
-      if (querySnapshot.empty) {
-        toast({
-            variant: "destructive",
-            title: "登入失敗",
-            description: "PIN 碼錯誤，請重試。",
-        });
-        return false;
-      }
-
-      const matchedUser = querySnapshot.docs[0].data() as Omit<User, 'id'>;
-      const userWithId: User = {
-        id: querySnapshot.docs[0].id,
-        ...matchedUser
-      };
-      
-      setUser(userWithId);
-      return true;
-
-    } catch (error) {
-      console.error("Error logging in:", error);
-      toast({
-          variant: "destructive",
-          title: "登入錯誤",
-          description: "查詢使用者資料時發生問題。",
-      });
-      return false;
-    }
-
-  }, [toast, firestore]);
+    // This is now a mock login as we are always logged in as admin
+    toast({
+        title: "開發者模式",
+        description: "已自動以管理員身份登入。",
+    });
+    return true;
+  }, [toast]);
 
   const logout = useCallback(() => {
-    setUser(null);
+    // For testing, logout will also just set the user back to admin
+    setUser(adminUserForTesting);
+    toast({
+      title: '開發者模式',
+      description: '已重新登入為管理員。',
+    });
   }, []);
   
   const setUserRole = useCallback((role: UserRole) => {
