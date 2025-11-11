@@ -145,7 +145,6 @@ export default function VideoPage() {
     }
 
     setIsUploading(true);
-    enterAnnotationMode('select'); // Switch to select mode to allow interaction
 
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
@@ -188,6 +187,8 @@ export default function VideoPage() {
         if (imageAnnotationInputRef.current) {
           imageAnnotationInputRef.current.value = '';
         }
+        // Set mode to select to allow interaction with the new image
+        setAnnotationMode('select');
     }
   };
 

@@ -9,7 +9,7 @@ interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData | ImageAnnotationData, type: 'pen' | 'text' | 'image') => void;
+  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
   annotationMode: AnnotationMode;
   penColor: string;
