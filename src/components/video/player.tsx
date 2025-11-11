@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 
 interface VideoPlayerProps {
   src: string;
+  poster?: string;
   videoRef: React.RefObject<HTMLVideoElement>;
   isPaused?: boolean; // New prop to control playback from parent
 }
 
-export default function VideoPlayer({ src, videoRef, isPaused }: VideoPlayerProps) {
+export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -104,7 +105,7 @@ export default function VideoPlayer({ src, videoRef, isPaused }: VideoPlayerProp
 
   return (
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group">
-      <video ref={videoRef} src={src} className="w-full h-full" onClick={togglePlay} />
+      <video ref={videoRef} src={src} poster={poster} className="w-full h-full" onClick={togglePlay} />
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <Slider
           value={[progress]}
