@@ -1,11 +1,7 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
-import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import { doc } from 'firebase/firestore';
-
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -17,51 +13,52 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const initialUsers: Omit<User, 'id'>[] = [
-    { name: 'Admin User', role: 'admin', pin: '2652' },
-    { name: '員工 A', role: 'employee', pin: '3768' },
-    { name: '員工 B', role: 'employee', pin: '9564' },
+// Re-introducing mock user data for local testing
+const mockUsers: User[] = [
+    { id: 'user-admin', name: 'Admin User', role: 'admin', pin: '2652' },
+    { id: 'user-employee-a', name: '員工 A', role: 'employee', pin: '3768' },
+    { id: 'user-employee-b', name: '員工 B', role: 'employee', pin: '9564' },
 ];
-
-const adminUserForTesting: User = {
-  id: 'admin-test-id',
-  name: 'Admin User',
-  role: 'admin',
-  pin: '2652'
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
-  const firestore = useFirestore();
-
-  useEffect(() => {
-    // Set user to admin for UI testing
-    setUser(adminUserForTesting);
-  }, []);
-
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
-    // This is now a mock login as we are always logged in as admin
-    toast({
-        title: "開發者模式",
-        description: "已自動以管理員身份登入。",
-    });
-    return true;
+    const foundUser = mockUsers.find(u => u.pin === pin);
+    
+    if (foundUser) {
+      setUser(foundUser);
+      toast({
+        title: `歡迎， ${foundUser.name}`,
+        description: `您已成功以 ${foundUser.role} 身份登入。`,
+      });
+      return true;
+    } else {
+      toast({
+        variant: 'destructive',
+        title: '登入失敗',
+        description: 'PIN 碼錯誤，請重試。',
+      });
+      return false;
+    }
   }, [toast]);
 
   const logout = useCallback(() => {
-    // For testing, logout will also just set the user back to admin
-    setUser(adminUserForTesting);
+    setUser(null);
     toast({
-      title: '開發者模式',
-      description: '已重新登入為管理員。',
+      title: '已登出',
+      description: '您已成功登出。',
     });
-  }, []);
+  }, [toast]);
   
   const setUserRole = useCallback((role: UserRole) => {
-    // This is a mock function for now. In a real app, you'd fetch the user by role.
-    console.log("Switching to user with role:", role);
+    const foundUser = mockUsers.find(u => u.role === role);
+    if (foundUser) {
+        setUser(foundUser);
+    } else {
+        console.warn(`No mock user found for role: ${role}`);
+    }
   }, []);
 
   return (
