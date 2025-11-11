@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 
 
 interface AuthContextType {
@@ -16,10 +17,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const initialUsers: Omit<User, 'id'>[] = [
+    { name: 'Admin User', role: 'admin', pin: '2652' },
+    { name: '員工 A', role: 'employee', pin: '3768' },
+    { name: '員工 B', role: 'employee', pin: '9564' },
+];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
   const firestore = useFirestore();
+
+  useEffect(() => {
+    const seedInitialUsers = async () => {
+        if (!firestore) return;
+        const usersCollection = collection(firestore, 'users');
+        const snapshot = await getDocs(usersCollection);
+        if (snapshot.empty) {
+            console.log('No users found, seeding initial data...');
+            const batch = writeBatch(firestore);
+            initialUsers.forEach(userData => {
+                const userRef = doc(usersCollection);
+                batch.set(userRef, userData);
+            });
+            await batch.commit();
+            console.log('Initial users seeded.');
+        } else {
+            console.log('Users collection is not empty.');
+        }
+    };
+    seedInitialUsers().catch(console.error);
+  }, [firestore]);
+
 
   const usersQuery = useMemo(() => {
     if (!firestore) return null;

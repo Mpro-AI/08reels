@@ -4,6 +4,7 @@ export type User = {
   id: string;
   name: string;
   role: UserRole;
+  pin?: string;
 };
 
 export type Comment = {
