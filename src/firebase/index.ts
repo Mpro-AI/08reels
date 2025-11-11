@@ -3,7 +3,7 @@ import { getAuth, Auth, signInAnonymously, onAuthStateChanged, signOut } from 'f
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
-import { firebaseConfig } from './config';
+import { getFirebaseConfig } from './config';
 
 // Note: This is a private, non-published package that provides 
 // a rich, contextual error experience for Firebase Security Rules.
@@ -15,6 +15,7 @@ export async function initializeFirebase(): Promise<{
   firestore: Firestore;
   storage: FirebaseStorage;
 }> {
+  const firebaseConfig = getFirebaseConfig();
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   const auth = getAuth(app);
   const firestore = getFirestore(app);
