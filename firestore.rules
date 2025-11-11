@@ -14,6 +14,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Check for a custom claim 'admin' on the user's token.
       return request.auth.token.admin == true;
     }
 
@@ -40,7 +41,7 @@ service cloud.firestore {
         let versions = videoData.versions;
         
         // Check required top-level fields
-        if (!('title' in videoData) || !('thumbnailUrl' in videoData) || !('author' in videoData) || !('uploadedAt' in videoData) || !('versions' in videoData) || !('videoUrl' in videoData)) {
+        if (!('title' in videoData) || !('thumbnailUrl' in videoData) || !('author' in videoData) || !('assignedTo' in videoData) || !('uploadedAt' in videoData) || !('versions' in videoData) || !('videoUrl' in videoData)) {
           return false;
         }
 

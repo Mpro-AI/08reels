@@ -1,5 +1,5 @@
 'use client';
-import { useState, ReactNode, useEffect } from 'react';
+import { useState, ReactNode, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,21 +16,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { Video } from '@/lib/types';
+import { Video, User } from '@/lib/types';
 import { addVersionToVideo, addVideo } from '@/firebase/firestore/videos';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { uploadVideoAndGetUrl } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { collection } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
 
 const formSchema = z.object({
   title: z.string().optional(),
+  assignedTo: z.string().optional(),
   notes: z.string().optional(),
   videoFile: z.instanceof(FileList)
     .refine(files => files?.length > 0, '請選擇一個影片檔案')
@@ -44,7 +47,7 @@ const formSchema = z.object({
 type UploadVideoForm = z.infer<typeof formSchema>;
 
 interface UploadVideoDialogProps {
-  video?: Video; // If provided, it's a new version. Otherwise, it's a new video project.
+  video?: Video;
   children: ReactNode;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -58,6 +61,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   const firestore = useFirestore();
   const storage = useStorage();
 
+  const usersQuery = useMemo(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+  const { data: users, loading: usersLoading } = useCollection<User>(usersQuery);
+
   const form = useForm<UploadVideoForm>({
     resolver: zodResolver(formSchema.refine(data => video || data.title, {
       message: "標題為必填欄位",
@@ -65,6 +71,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
     })),
     defaultValues: {
       title: '',
+      assignedTo: '',
       notes: '',
       videoFile: undefined
     }
@@ -73,10 +80,11 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   useEffect(() => {
     if(isOpen) {
       form.reset();
+      form.setValue('assignedTo', user?.id || '');
       setIsSubmitting(false);
       setUploadProgress(0);
     }
-  }, [isOpen, form]);
+  }, [isOpen, form, user]);
 
   const handleClose = () => {
     if (isSubmitting) return;
@@ -84,7 +92,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   };
 
   const onSubmit = async (data: UploadVideoForm) => {
-    if (!user || !firestore || !storage) {
+    if (!user || !firestore || !storage || !users) {
       toast({ variant: 'destructive', title: '錯誤', description: '使用者未登入或服務連線失敗' });
       return;
     }
@@ -102,13 +110,18 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
         );
 
         if (video) {
-            // Add new version to existing video
             await addVersionToVideo(firestore, video.id, downloadURL, { id: user.id, name: user.name }, data.notes);
             toast({ title: '成功', description: '新版本已成功提交。' });
         } else {
-            // Create a new video project
-            if (!data.title) {
-                toast({ variant: 'destructive', title: '錯誤', description: '請提供影片標題。' });
+            if (!data.title || !data.assignedTo) {
+                toast({ variant: 'destructive', title: '錯誤', description: '請提供影片標題並指派一位使用者。' });
+                setIsSubmitting(false);
+                return;
+            }
+            
+            const assignedUser = users.find(u => u.id === data.assignedTo);
+            if (!assignedUser) {
+                toast({ variant: 'destructive', title: '錯誤', description: '找不到被指派的使用者。' });
                 setIsSubmitting(false);
                 return;
             }
@@ -116,6 +129,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             const newVideoData = {
                 title: data.title,
                 videoUrl: downloadURL,
+                assignedTo: { id: assignedUser.id, name: assignedUser.name },
                 notes: data.notes,
             };
             await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
@@ -150,18 +164,41 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             </DialogHeader>
             <div className="grid gap-4 py-4">
               {!video && (
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem className="grid grid-cols-4 items-center gap-4">
-                      <FormLabel className="text-right">標題</FormLabel>
-                      <FormControl className="col-span-3">
-                        <Input {...field} disabled={isSubmitting} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem className="grid grid-cols-4 items-center gap-4">
+                        <FormLabel className="text-right">標題</FormLabel>
+                        <FormControl className="col-span-3">
+                          <Input {...field} disabled={isSubmitting} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="assignedTo"
+                    render={({ field }) => (
+                      <FormItem className="grid grid-cols-4 items-center gap-4">
+                        <FormLabel className="text-right">指派給</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                          <FormControl className="col-span-3">
+                            <SelectTrigger disabled={isSubmitting || usersLoading}>
+                              <SelectValue placeholder={usersLoading ? "載入中..." : "選擇一位使用者"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {users?.map(u => (
+                              <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
               <FormField
                 control={form.control}
@@ -193,9 +230,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                   </FormItem>
                 )}
               />
-               {(form.formState.errors.title || form.formState.errors.videoFile) && (
+               {(form.formState.errors.title || form.formState.errors.videoFile || form.formState.errors.assignedTo) && (
                   <div className="col-span-4">
-                    <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>
+                    <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString() || form.formState.errors.assignedTo?.message}</FormMessage>
                   </div>
               )}
               {isSubmitting && (
@@ -207,7 +244,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || usersLoading}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
               </Button>
             </DialogFooter>

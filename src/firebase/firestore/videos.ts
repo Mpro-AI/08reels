@@ -169,7 +169,7 @@ export async function addVersionToVideo(
 export async function addVideo(
     db: Firestore,
     videoId: string,
-    newVideoData: { title: string; videoUrl: string, notes?: string },
+    newVideoData: { title: string; videoUrl: string; assignedTo: Pick<User, 'id' | 'name'>, notes?: string },
     author: Pick<User, 'id' | 'name'>
 ) {
     const videoRef = doc(db, 'videos', videoId);
@@ -194,6 +194,7 @@ export async function addVideo(
             thumbnailUrl: placeholder.imageUrl,
             thumbnailHint: placeholder.imageHint,
             author: author,
+            assignedTo: newVideoData.assignedTo,
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
             videoUrl: newVideoData.videoUrl,
