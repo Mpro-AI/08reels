@@ -5,6 +5,20 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Icons } from '@/components/icons';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+
+const formSchema = z.object({
+  email: z.string().email({ message: '請輸入有效的電子郵件地址' }),
+  password: z.string().min(6, { message: '密碼長度至少需要 6 個字元' }),
+});
+
+type UserFormValue = z.infer<typeof formSchema>;
 
 // Simple inline SVG for Google Icon
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -18,18 +32,49 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isLoginView, setIsLoginView] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { loginWithGoogle, loginWithEmail, signupWithEmail } = useAuth();
+  const { toast } = useToast();
 
-  const handleLogin = async () => {
-    setIsLoading(true);
-    const success = await login();
+  const form = useForm<UserFormValue>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    const success = await loginWithGoogle();
     if (success) {
-      const redirectUrl = searchParams.get('redirect') || '/';
-      router.push(redirectUrl);
+      redirectToDashboard();
     } else {
-      setIsLoading(false);
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const redirectToDashboard = () => {
+    const redirectUrl = searchParams.get('redirect') || '/';
+    router.push(redirectUrl);
+  };
+  
+  const onSubmit = async (data: UserFormValue) => {
+    setIsLoading(true);
+    let success = false;
+    if (isLoginView) {
+        success = await loginWithEmail(data.email, data.password);
+    } else {
+        success = await signupWithEmail(data.email, data.password);
+    }
+
+    if (success) {
+        redirectToDashboard();
+    } else {
+        setIsLoading(false);
     }
   };
 
@@ -40,22 +85,70 @@ export function LoginForm() {
             <Icons.logo className="h-12 w-12 text-primary"/>
         </div>
         <CardTitle className="text-2xl font-headline">Reels 08小隊</CardTitle>
-        <CardDescription>請使用您的 Google 帳號登入</CardDescription>
+        <CardDescription>
+            {isLoginView ? '登入您的帳號' : '建立一個新帳號'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <Button type="button" className="w-full" disabled={isLoading} onClick={handleLogin}>
-            {isLoading ? (
-              '登入中...'
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>電子郵件</FormLabel>
+                  <FormControl>
+                    <Input placeholder="name@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>密碼</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
+              {isLoading ? '處理中...' : (isLoginView ? '登入' : '註冊')}
+            </Button>
+          </form>
+        </Form>
+        <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">或繼續使用</span>
+            </div>
+        </div>
+        <Button type="button" variant="outline" className="w-full" disabled={isLoading || isGoogleLoading} onClick={handleGoogleLogin}>
+            {isGoogleLoading ? (
+              '處理中...'
             ) : (
               <>
                 <GoogleIcon className="mr-2" />
-                使用 Google 帳號登入
+                Google 帳號
               </>
             )}
-          </Button>
-        </div>
+        </Button>
+        <p className="mt-4 px-8 text-center text-sm text-muted-foreground">
+            <button onClick={() => setIsLoginView(!isLoginView)} className="underline underline-offset-4 hover:text-primary">
+                {isLoginView ? '還沒有帳號嗎？註冊一個' : '已經有帳號了？直接登入'}
+            </button>
+        </p>
       </CardContent>
     </Card>
   );
 }
+
+    

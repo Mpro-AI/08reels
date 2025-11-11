@@ -10,7 +10,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   loading: boolean;
-  login: () => Promise<boolean>;
+  loginWithGoogle: () => Promise<boolean>;
+  loginWithEmail: (email: string, password: string) => Promise<boolean>;
+  signupWithEmail: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -26,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (firebaseUser) {
       const appUser: User = {
         id: firebaseUser.uid,
-        name: firebaseUser.displayName || 'Anonymous',
+        name: firebaseUser.displayName || firebaseUser.email || 'Anonymous',
         email: firebaseUser.email,
         photoURL: firebaseUser.photoURL,
       };
@@ -43,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Lazy load auth functions only when firebaseAuth is available
     Promise.all([
         import('firebase/auth').then(m => m.onAuthStateChanged),
         import('firebase/auth').then(m => m.getRedirectResult)
@@ -61,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           .catch((error) => {
             console.error("Google redirect result error", error);
-            // Handle specific API key error silently as it might be a race condition on first load
             if (error.code !== 'auth/api-key-not-valid') {
               toast({
                 variant: 'destructive',
@@ -81,33 +81,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const isAuthenticated = !!user;
 
-  const login = useCallback(async (): Promise<boolean> => {
+  const loginWithGoogle = useCallback(async (): Promise<boolean> => {
     if (!firebaseAuth) {
-      toast({
-        variant: 'destructive',
-        title: '錯誤',
-        description: '認證服務尚未準備好。',
-      });
+      toast({ variant: 'destructive', title: '錯誤', description: '認證服務尚未準備好。' });
       return false;
     }
-
     setLoading(true);
-    
     try {
-      // Lazy load auth functions for login
       const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
       await signInWithRedirect(firebaseAuth, provider);
       return true;
     } catch (error: any) {
        console.error("Google sign-in redirect failed", error);
-       toast({
-        variant: 'destructive',
-        title: '登入失敗',
-        description: '無法啟動 Google 登入流程，請稍後再試。',
-      });
-      setLoading(false);
+       toast({ variant: 'destructive', title: '登入失敗', description: '無法啟動 Google 登入流程，請稍後再試。' });
+       setLoading(false);
+       return false;
+    }
+  }, [firebaseAuth, toast]);
+
+  const loginWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
+    if (!firebaseAuth) {
+      toast({ variant: 'destructive', title: '錯誤', description: '認證服務尚未準備好。' });
       return false;
+    }
+    setLoading(true);
+    try {
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      toast({ title: '登入成功' });
+      return true;
+    } catch (error: any) {
+      console.error("Email sign-in failed", error);
+      let description = '發生未知錯誤，請稍後再試。';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        description = '電子郵件或密碼不正確。';
+      }
+      toast({ variant: 'destructive', title: '登入失敗', description });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [firebaseAuth, toast]);
+
+  const signupWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
+    if (!firebaseAuth) {
+      toast({ variant: 'destructive', title: '錯誤', description: '認證服務尚未準備好。' });
+      return false;
+    }
+    setLoading(true);
+    try {
+      const { createUserWithEmailAndPassword } = await import('firebase/auth');
+      await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      toast({ title: '註冊成功', description: '歡迎加入！您現在可以登入。' });
+      return true;
+    } catch (error: any) {
+      console.error("Email sign-up failed", error);
+      let description = '發生未知錯誤，請稍後再試。';
+      if (error.code === 'auth/email-already-in-use') {
+        description = '這個電子郵件地址已經被註冊了。';
+      } else if (error.code === 'auth/weak-password') {
+        description = '密碼強度不足，請使用更長的密碼。';
+      } else if (error.code === 'auth/invalid-email') {
+        description = '請輸入有效的電子郵件地址。';
+      }
+      toast({ variant: 'destructive', title: '註冊失敗', description });
+      return false;
+    } finally {
+      setLoading(false);
     }
   }, [firebaseAuth, toast]);
 
@@ -118,24 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { signOut } = await import('firebase/auth');
         await signOut(firebaseAuth);
         setUser(null);
-        toast({
-          title: '已登出',
-          description: '您已成功登出。',
-        });
+        toast({ title: '已登出', description: '您已成功登出。' });
     } catch(error) {
         console.error("Sign out failed", error);
-        toast({
-            variant: 'destructive',
-            title: '登出失敗',
-            description: '登出時發生錯誤。'
-        });
+        toast({ variant: 'destructive', title: '登出失敗', description: '登出時發生錯誤。' });
     } finally {
         setLoading(false);
     }
   }, [toast, firebaseAuth]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, loading, loginWithGoogle, loginWithEmail, signupWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );
