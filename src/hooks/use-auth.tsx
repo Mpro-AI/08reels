@@ -24,60 +24,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const firebaseAuth = useFirebaseAuth();
 
-  const handleUser = useCallback((firebaseUser: FirebaseUser | null) => {
-    if (firebaseUser) {
-      const appUser: User = {
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email || 'Anonymous',
-        email: firebaseUser.email,
-        photoURL: firebaseUser.photoURL,
-      };
-      setUser(appUser);
-    } else {
-      setUser(null);
-    }
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
     if (!firebaseAuth) {
       setLoading(false);
       return;
     }
 
-    Promise.all([
-        import('firebase/auth').then(m => m.onAuthStateChanged),
-        import('firebase/auth').then(m => m.getRedirectResult)
-    ]).then(([onAuthStateChanged, getRedirectResult]) => {
-        const unsubscribe = onAuthStateChanged(firebaseAuth, handleUser);
+    const initAuth = async () => {
+        try {
+            const { onAuthStateChanged, getRedirectResult } = await import('firebase/auth');
 
-        getRedirectResult(firebaseAuth)
-          .then((result) => {
-            if (result) {
-              toast({
-                title: `歡迎回來, ${result.user.displayName}`,
-                description: `您已使用 Google 帳號成功登入。`,
+            const handleUser = (firebaseUser: FirebaseUser | null) => {
+                if (firebaseUser) {
+                    const appUser: User = {
+                        id: firebaseUser.uid,
+                        name: firebaseUser.displayName || firebaseUser.email || 'Anonymous',
+                        email: firebaseUser.email,
+                        photoURL: firebaseUser.photoURL,
+                    };
+                    setUser(appUser);
+                } else {
+                    setUser(null);
+                }
+                setLoading(false);
+            };
+
+            const unsubscribe = onAuthStateChanged(firebaseAuth, handleUser);
+
+            getRedirectResult(firebaseAuth)
+              .then((result) => {
+                if (result) {
+                  toast({
+                    title: `歡迎回來, ${result.user.displayName}`,
+                    description: `您已使用 Google 帳號成功登入。`,
+                  });
+                }
+              })
+              .catch((error) => {
+                console.error("Google redirect result error", error);
+                if (error.code !== 'auth/api-key-not-valid' && error.code !== 'auth/invalid-api-key') {
+                  toast({
+                    variant: 'destructive',
+                    title: '登入失敗',
+                    description: '處理您的登入資訊時發生錯誤。',
+                  });
+                }
               });
-            }
-          })
-          .catch((error) => {
-            console.error("Google redirect result error", error);
-            if (error.code !== 'auth/api-key-not-valid') {
-              toast({
-                variant: 'destructive',
-                title: '登入失敗',
-                description: '處理您的登入資訊時發生錯誤。',
-              });
-            }
-          });
+    
+            return unsubscribe;
 
-        return () => unsubscribe();
-    }).catch(error => {
-        console.error("Failed to load Firebase Auth functions", error);
-        setLoading(false);
-    });
+        } catch (error) {
+            console.error("Failed to load Firebase Auth functions", error);
+            setLoading(false);
+            return () => {};
+        }
+    };
 
-  }, [firebaseAuth, handleUser, toast]);
+    let unsubscribe: (() => void) | undefined;
+    initAuth().then(unsub => unsubscribe = unsub);
+    
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
+  }, [firebaseAuth, toast]);
   
   const isAuthenticated = !!user;
 
@@ -116,11 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let description = '發生未知錯誤，請稍後再試。';
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         description = '電子郵件或密碼不正確。';
+      } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/api-key-not-valid') {
+        description = 'Firebase 設定無效，請聯絡管理員。'
       }
       toast({ variant: 'destructive', title: '登入失敗', description });
+      setLoading(false); // Make sure to set loading false on error
       return false;
-    } finally {
-      setLoading(false);
     }
   }, [firebaseAuth, toast]);
 
@@ -134,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { createUserWithEmailAndPassword } = await import('firebase/auth');
       await createUserWithEmailAndPassword(firebaseAuth, email, password);
       toast({ title: '註冊成功', description: '歡迎加入！您現在可以登入。' });
+      // setLoading is handled by onAuthStateChanged
       return true;
     } catch (error: any) {
       console.error("Email sign-up failed", error);
@@ -144,11 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description = '密碼強度不足，請使用更長的密碼。';
       } else if (error.code === 'auth/invalid-email') {
         description = '請輸入有效的電子郵件地址。';
+      } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/api-key-not-valid') {
+        description = 'Firebase 設定無效，請聯絡管理員。'
       }
       toast({ variant: 'destructive', title: '註冊失敗', description });
+      setLoading(false); // Make sure to set loading false on error
       return false;
-    } finally {
-      setLoading(false);
     }
   }, [firebaseAuth, toast]);
 
