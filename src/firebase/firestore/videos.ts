@@ -13,7 +13,6 @@ import {
 import type { Video, Comment, VersionStatus, User, Version } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function setVideo(
   db: Firestore,
@@ -186,13 +185,11 @@ export async function addVideo(
             videoUrl: newVideoData.videoUrl,
             notes: newVideoData.notes,
         };
-        
-        const placeholder = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
 
         const newVideo: Omit<Video, 'id'> = {
             title: newVideoData.title,
-            thumbnailUrl: placeholder.imageUrl,
-            thumbnailHint: placeholder.imageHint,
+            thumbnailUrl: 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video',
+            thumbnailHint: 'video placeholder',
             author: author,
             assignedTo: newVideoData.assignedTo,
             uploadedAt: Timestamp.now().toDate().toISOString(),
