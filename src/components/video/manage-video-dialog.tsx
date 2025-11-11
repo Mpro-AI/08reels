@@ -165,7 +165,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
                             }}
                             />
                             <Label htmlFor={`manage-user-${employee.id}`} className="font-normal w-full">
-                            {employee.name} <span className="text-muted-foreground text-xs">({employee.email})</span>
+                              {employee.name} <span className="text-muted-foreground text-xs">({employee.email})</span>
                             </Label>
                         </div>
                         ))}
