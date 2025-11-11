@@ -9,13 +9,12 @@ interface AuthContextType {
   loading: boolean;
   login: (pin: string) => Promise<boolean>;
   logout: () => void;
-  setUserRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Re-introducing mock user data for local testing
-const mockUsers: User[] = [
+export const mockUsers: User[] = [
     { id: 'user-admin', name: 'Admin User', role: 'admin', pin: '2652' },
     { id: 'user-employee-a', name: '員工 A', role: 'employee', pin: '3768' },
     { id: 'user-employee-b', name: '員工 B', role: 'employee', pin: '9564' },
@@ -67,20 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // A small delay to allow state to update before redirect happens
     setTimeout(() => setLoading(false), 50);
   }, [toast]);
-  
-  const setUserRole = useCallback((role: UserRole) => {
-    const foundUser = mockUsers.find(u => u.role === role);
-    if (foundUser) {
-        setLoading(true);
-        setUser(foundUser);
-        setLoading(false);
-    } else {
-        console.warn(`No mock user found for role: ${role}`);
-    }
-  }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout, setUserRole }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
