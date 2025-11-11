@@ -9,7 +9,8 @@ import {
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   User as FirebaseUser,
 } from 'firebase/auth';
 
@@ -52,8 +53,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const unsubscribe = onAuthStateChanged(firebaseAuth, handleUser);
 
+    getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (result) {
+          toast({
+            title: `歡迎回來, ${result.user.displayName}`,
+            description: `您已使用 Google 帳號成功登入。`,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Google redirect result error", error);
+        toast({
+          variant: 'destructive',
+          title: '登入失敗',
+          description: '處理您的登入資訊時發生錯誤。',
+        });
+      });
+
+
     return () => unsubscribe();
-  }, [firebaseAuth, handleUser]);
+  }, [firebaseAuth, handleUser, toast]);
   
   const isAuthenticated = !!user;
 
@@ -69,29 +89,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
     const provider = new GoogleAuthProvider();
-
+    
     try {
-      const result = await signInWithPopup(firebaseAuth, provider);
-      handleUser(result.user);
-      toast({
-        title: `歡迎， ${result.user.displayName}`,
-        description: `您已使用 Google 帳號成功登入。`,
-      });
-      setLoading(false);
+      await signInWithRedirect(firebaseAuth, provider);
+      // The redirect will cause the page to unload, so we don't need to do anything here.
+      // The result will be handled by getRedirectResult in the useEffect hook.
       return true;
     } catch (error: any) {
-      console.error("Google sign-in failed", error);
-      toast({
+       console.error("Google sign-in redirect failed", error);
+       toast({
         variant: 'destructive',
         title: '登入失敗',
-        description: error.code === 'auth/popup-closed-by-user' 
-          ? '您已關閉登入視窗。'
-          : '無法使用 Google 登入，請稍後再試。',
+        description: '無法啟動 Google 登入流程，請稍後再試。',
       });
       setLoading(false);
       return false;
     }
-  }, [firebaseAuth, toast, handleUser]);
+  }, [firebaseAuth, toast]);
 
   const logout = useCallback(async () => {
     if (!firebaseAuth) return;
