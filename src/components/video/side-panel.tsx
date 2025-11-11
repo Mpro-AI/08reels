@@ -5,6 +5,7 @@ import { MessageSquare, GitBranch } from 'lucide-react';
 import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import { Video, Version, VersionStatus } from '@/lib/types';
+import type { AnnotationMode } from '@/app/videos/[id]/page';
 
 interface SidePanelProps {
   video: Video;
@@ -15,7 +16,7 @@ interface SidePanelProps {
   onAddComment: (commentText: string, timecode?: number) => void;
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
   onDeleteComment: (commentId: string) => void;
-  onEnterAnnotationMode: (mode: 'pen' | 'image' | 'text') => void;
+  onEnterAnnotationMode: (mode: AnnotationMode) => void;
 }
 
 export default function SidePanel({ 

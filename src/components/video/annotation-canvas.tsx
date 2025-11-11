@@ -2,6 +2,8 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
+import type { AnnotationMode } from '@/app/videos/[id]/page';
+
 
 interface AnnotationCanvasProps {
   width: number;
@@ -9,8 +11,9 @@ interface AnnotationCanvasProps {
   annotations: Annotation[];
   onAddAnnotation: (data: PenAnnotationData | { x: number; y: number } | TextAnnotationData) => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
-  annotationMode: 'pen' | 'image' | 'text' | null;
-  isAnnotating: boolean;
+  annotationMode: AnnotationMode;
+  penColor: string;
+  penLineWidth: number;
 }
 
 type Action = 'drawing' | 'dragging' | 'resizing' | 'rotating' | 'none';
@@ -26,7 +29,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   onAddAnnotation,
   onUpdateAnnotation,
   annotationMode,
-  isAnnotating,
+  penColor,
+  penLineWidth,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [action, setAction] = useState<Action>('none');
@@ -168,14 +172,14 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     });
 
     if (action === 'drawing' && currentPath.length > 1) {
-       drawPenAnnotation(ctx, { path: currentPath, color: '#FF0000', lineWidth: 3 });
+       drawPenAnnotation(ctx, { path: currentPath, color: penColor, lineWidth: penLineWidth });
     }
   };
   // #endregion
 
   useEffect(() => {
     redrawCanvas();
-  }, [annotations, selectedAnnotationId, currentPath, width, height, action]);
+  }, [annotations, selectedAnnotationId, currentPath, width, height, action, penColor, penLineWidth]);
 
 
   // #region Interaction Logic
@@ -270,7 +274,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                 height: fontSize,
                 fontSize,
                 fontFamily,
-                color: '#FF0000',
+                color: penColor,
                 rotation: 0,
             };
             onAddAnnotation(textData);
@@ -278,15 +282,17 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         return;
     }
 
-    // Interaction with existing annotations
-    const selected = getAnnotationAtPoint(coords);
-    setSelectedAnnotationId(selected?.id || null);
+    // Interaction with existing annotations if mode is 'select'
+    if(annotationMode === 'select') {
+      const selected = getAnnotationAtPoint(coords);
+      setSelectedAnnotationId(selected?.id || null);
 
-    if (selected) {
-      const currentAction = getActionForPoint(coords, selected);
-      setAction(currentAction);
-    } else {
-      setAction('none');
+      if (selected) {
+        const currentAction = getActionForPoint(coords, selected);
+        setAction(currentAction);
+      } else {
+        setAction('none');
+      }
     }
   };
 
@@ -296,16 +302,16 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     const coords = getCoords(e);
     if (!coords) return;
     
+    if (action === 'drawing') {
+        setCurrentPath((prev) => [...prev, coords]);
+        return;
+    }
+    
     const selectedAnnotation = annotations.find(a => a.id === selectedAnnotationId);
     if (!selectedAnnotation || (selectedAnnotation.type !== 'image' && selectedAnnotation.type !== 'text')) return;
     
     let updatedData = { ...selectedAnnotation.data } as ImageAnnotationData | TextAnnotationData;
     
-    if (action === 'drawing') {
-        setCurrentPath((prev) => [...prev, coords]);
-        return;
-    }
-
     const dx = coords.x - startPoint.x;
     const dy = coords.y - startPoint.y;
 
@@ -349,8 +355,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     if (action === 'drawing' && currentPath.length > 1) {
       const annotationData: PenAnnotationData = {
         path: currentPath,
-        color: '#FF0000',
-        lineWidth: 3,
+        color: penColor,
+        lineWidth: penLineWidth,
       };
       onAddAnnotation(annotationData);
     }
@@ -362,13 +368,18 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   // #endregion
 
   const cursor = () => {
-    if(annotationMode === 'image' || annotationMode === 'text') return 'crosshair';
-    if(annotationMode === 'pen') return 'auto';
+    if(annotationMode === 'pen') return 'crosshair';
+    if(annotationMode === 'image') return 'copy';
+    if(annotationMode === 'text') return 'text';
     if(action === 'dragging') return 'grabbing';
     if(action === 'resizing') return 'nwse-resize';
     if(action === 'rotating') return 'alias';
+    if(annotationMode === 'select' && selectedAnnotationId) return 'grab';
     return 'default';
   }
+
+  const pointerEventsEnabled = annotationMode !== 'select' || (annotations && annotations.length > 0);
+
 
   return (
     <canvas
@@ -384,7 +395,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       onTouchEnd={handleMouseUp}
       className="absolute top-0 left-0"
       style={{ 
-        pointerEvents: isAnnotating || annotations.length > 0 ? 'auto' : 'none',
+        pointerEvents: pointerEventsEnabled ? 'auto' : 'none',
         cursor: cursor()
       }}
     />

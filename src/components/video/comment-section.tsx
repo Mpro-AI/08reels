@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { cn } from '@/lib/utils';
+import type { AnnotationMode } from '@/app/videos/[id]/page';
 
 
 interface CommentSectionProps {
@@ -28,7 +29,7 @@ interface CommentSectionProps {
   inputValue: string;
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
-  onEnterAnnotationMode: (mode: 'pen' | 'image' | 'text') => void;
+  onEnterAnnotationMode: (mode: AnnotationMode) => void;
 }
 
 export default function CommentSection({ 
@@ -76,6 +77,15 @@ export default function CommentSection({
                 <Plus className="mr-2 h-4 w-4" />
                 新增評論
             </Button>
+            <Button variant="outline" size="icon" onClick={() => onEnterAnnotationMode('pen')}>
+                <PenLine className="h-4 w-4"/>
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => onEnterAnnotationMode('image')}>
+                <ImageUp className="h-4 w-4"/>
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => onEnterAnnotationMode('text')}>
+                <Type className="h-4 w-4"/>
+            </Button>
           </div>
         </div>
         <div className="space-y-4 max-h-[calc(100vh-25rem)] overflow-y-auto pr-2">
@@ -103,15 +113,6 @@ export default function CommentSection({
                     "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
                     "opacity-0 group-hover/comment:opacity-100 transition-opacity"
                 )}>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('pen'); }}>
-                        <PenLine className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('image'); }}>
-                        <ImageUp className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('text'); }}>
-                        <Type className="h-3.5 w-3.5"/>
-                    </Button>
                     {canDelete(comment) && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>

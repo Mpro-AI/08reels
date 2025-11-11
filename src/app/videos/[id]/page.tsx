@@ -15,6 +15,7 @@ import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import { Button } from '@/components/ui/button';
 import { X, Save, Loader2 } from 'lucide-react';
+import AnnotationToolbar from '@/components/video/annotation-toolbar';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -24,7 +25,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-type AnnotationMode = 'pen' | 'image' | 'text' | null;
+export type AnnotationMode = 'pen' | 'image' | 'text' | 'select';
 
 export default function VideoPage() {
   const params = useParams();
@@ -45,13 +46,15 @@ export default function VideoPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const { toast } = useToast();
 
-  const [annotationMode, setAnnotationMode] = useState<AnnotationMode>(null);
+  const [isAnnotating, setIsAnnotating] = useState(false);
+  const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('select');
+  const [penColor, setPenColor] = useState('#FF0000');
+  const [penLineWidth, setPenLineWidth] = useState(3);
+  
   const [newAnnotations, setNewAnnotations] = useState<Annotation[]>([]);
   const [imageAnnotationFile, setImageAnnotationFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const imageAnnotationInputRef = useRef<HTMLInputElement>(null);
-
-  const isAnnotating = annotationMode !== null;
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
@@ -79,13 +82,14 @@ export default function VideoPage() {
     
     const commentTime = timecode !== undefined ? timecode : currentTime;
 
-    const newComment: Omit<Comment, 'id' | 'createdAt' | 'author'> = {
+    const newComment: Omit<Comment, 'id' | 'createdAt'> = {
       timecode: Math.floor(commentTime),
       timecodeFormatted: formatTime(commentTime),
       text: commentText,
+      author: user,
     };
     
-    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, user as User);
+    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, user);
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
@@ -124,7 +128,9 @@ export default function VideoPage() {
     if (playerRef.current) {
       playerRef.current.pause();
     }
+    setIsAnnotating(true);
     setAnnotationMode(mode);
+
     if (mode === 'image') {
       imageAnnotationInputRef.current?.click();
     }
@@ -136,7 +142,8 @@ export default function VideoPage() {
       setImageAnnotationFile(file);
       toast({ title: '圖片已選取', description: '請在影片畫面上點擊以放置圖片。' });
     } else {
-      setAnnotationMode(null); // No file selected, exit image mode
+      // No file selected, revert to select mode
+      setAnnotationMode('select'); 
     }
     // Reset file input to allow selecting the same file again
     if (imageAnnotationInputRef.current) {
@@ -157,16 +164,16 @@ export default function VideoPage() {
     if (annotationMode === 'pen' && 'path' in data) {
       newAnnotation = {
         type: 'pen',
-        data: data as PenAnnotationData,
+        data,
         ...commonData,
       };
     } else if (annotationMode === 'text' && 'text' in data) {
         newAnnotation = {
             type: 'text',
-            data: data as TextAnnotationData,
+            data,
             ...commonData,
         };
-        setAnnotationMode(null);
+        setAnnotationMode('select');
     } else if (annotationMode === 'image' && imageAnnotationFile && 'x' in data) {
       setIsUploading(true);
       try {
@@ -200,7 +207,7 @@ export default function VideoPage() {
       } finally {
         setIsUploading(false);
         setImageAnnotationFile(null);
-        setAnnotationMode(null);
+        setAnnotationMode('select');
       }
     }
     
@@ -242,13 +249,15 @@ export default function VideoPage() {
     addAnnotationsToVersion(firestore, video.id, selectedVersionId, annotationsToAdd);
     
     setNewAnnotations([]);
-    setAnnotationMode(null);
+    setIsAnnotating(false);
+    setAnnotationMode('select');
     toast({ title: '註解已儲存' });
   };
   
-  const handleCancelAnnotations = () => {
+  const exitAnnotationMode = () => {
     setNewAnnotations([]);
-    setAnnotationMode(null);
+    setIsAnnotating(false);
+    setAnnotationMode('select');
     setImageAnnotationFile(null);
     setIsUploading(false);
   };
@@ -285,22 +294,20 @@ export default function VideoPage() {
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
                     <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating} />
-                    {(isAnnotating || newAnnotations.length > 0) && (
-                      <div className="absolute top-4 right-4 z-20 flex gap-2">
-                        {isUploading ? (
-                          <Button variant="outline" size="icon" disabled>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </Button>
-                        ) : (
-                          <>
-                            <Button variant="outline" size="icon" onClick={handleCancelAnnotations}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" onClick={handleSaveAnnotations} disabled={newAnnotations.length === 0}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                    {isAnnotating && (
+                      <div className="absolute top-4 z-20 flex w-full justify-center">
+                         <AnnotationToolbar
+                            mode={annotationMode}
+                            onModeChange={setAnnotationMode}
+                            color={penColor}
+                            onColorChange={setPenColor}
+                            lineWidth={penLineWidth}
+                            onLineWidthChange={setPenLineWidth}
+                            onSave={handleSaveAnnotations}
+                            onExit={exitAnnotationMode}
+                            isSavingDisabled={newAnnotations.length === 0}
+                            isUploading={isUploading}
+                          />
                       </div>
                     )}
                     <AnnotationCanvas 
@@ -310,7 +317,8 @@ export default function VideoPage() {
                       onAddAnnotation={handleAddAnnotation}
                       onUpdateAnnotation={handleUpdateAnnotation}
                       annotationMode={annotationMode}
-                      isAnnotating={isAnnotating}
+                      penColor={penColor}
+                      penLineWidth={penLineWidth}
                     />
                     <input 
                       type="file" 
