@@ -15,8 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
-import { Video, User } from '@/lib/types';
+import { useAuth, mockUsers } from '@/hooks/use-auth';
+import { Video } from '@/lib/types';
 import { addVersionToVideo, addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
@@ -25,7 +25,6 @@ import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { mockUsers } from '@/hooks/use-auth';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -66,6 +65,12 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
       message: "標題和指派對象為必填欄位",
       path: ["title"], // This is a bit of a hack, but it works for showing a general message
     })),
+    defaultValues: {
+      title: '',
+      notes: '',
+      assignedTo: '',
+      videoFile: undefined
+    }
   });
   
   useEffect(() => {
@@ -207,7 +212,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
               <FormField
                 control={form.control}
                 name="videoFile"
-                render={({ field }) => (
+                render={({ field: { onChange, value, ...rest }}) => (
                   <FormItem className="grid grid-cols-4 items-center gap-4">
                     <FormLabel className="text-right">影片檔案</FormLabel>
                     <FormControl className="col-span-3">
@@ -215,7 +220,8 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                           type="file" 
                           accept="video/mp4,video/quicktime,video/x-msvideo" 
                           disabled={isSubmitting}
-                          onChange={(e) => field.onChange(e.target.files)}
+                          onChange={(e) => onChange(e.target.files)}
+                          {...rest}
                        />
                     </FormControl>
                   </FormItem>
