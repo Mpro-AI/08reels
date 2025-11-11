@@ -130,6 +130,13 @@ export default function VideoPage() {
     }
   };
 
+  const handleAnnotationClick = useCallback((timecode: number, mode: AnnotationMode) => {
+    if (playerRef.current) {
+      playerRef.current.currentTime = timecode;
+    }
+    enterAnnotationMode(mode);
+  }, []);
+
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storage || !user || !selectedVersionId || !video) {
@@ -138,6 +145,7 @@ export default function VideoPage() {
     }
 
     setIsUploading(true);
+    enterAnnotationMode('select'); // Switch to select mode to allow interaction
 
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
@@ -171,7 +179,6 @@ export default function VideoPage() {
         
         setNewAnnotations(prev => [...prev, newAnnotation]);
         toast({ title: '圖片已新增', description: '您現在可以拖曳、縮放或旋轉圖片。' });
-        setAnnotationMode('select');
 
     } catch (error) {
         toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
@@ -325,7 +332,7 @@ export default function VideoPage() {
                         onAddComment={handleAddComment}
                         onVersionStatusChange={handleVersionStatusChange}
                         onDeleteComment={handleDeleteComment}
-                        onEnterAnnotationMode={enterAnnotationMode}
+                        onAnnotationClick={handleAnnotationClick}
                     />
                 </div>
             </main>
