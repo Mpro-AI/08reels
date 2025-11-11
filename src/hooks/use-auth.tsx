@@ -5,7 +5,7 @@ import type { User } from '@/lib/types';
 import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 // Import only types at the top level to avoid early initialization
 import type { User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -45,6 +45,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
+    if (!firestore) return;
+
+    // One-time script to ensure the admin user exists in Firestore
+    const ensureAdminUserExists = async () => {
+      const adminUid = 'VPkSokn932hWjebe6HpAqEcUWnX2';
+      const userRef = doc(firestore, 'users', adminUid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        const adminUser: User = {
+          id: adminUid,
+          name: 'ktphinhin9999',
+          email: 'ktphinhin9999@hotmail.com',
+          photoURL: null,
+        };
+        try {
+          await setDoc(userRef, adminUser);
+          console.log('Admin user manually added to Firestore.');
+        } catch (error) {
+          console.error('Failed to manually add admin user:', error);
+        }
+      }
+    };
+    ensureAdminUserExists();
+    
     if (!firebaseAuth) {
       setLoading(false);
       return;
@@ -83,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             unsubscribe();
         }
     };
-  }, [firebaseAuth, toast, updateUserProfileInFirestore]);
+  }, [firebaseAuth, firestore, toast, updateUserProfileInFirestore]);
   
   const isAuthenticated = !!user;
 
