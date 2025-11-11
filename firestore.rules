@@ -3,182 +3,126 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // =================================
+    // Helper Functions
+    // =================================
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(videoData) {
-      // An owner is the author of the video OR an admin user
-      return request.auth.uid == videoData.author.id || isAdmin();
-    }
-
     function isAdmin() {
-      // Check for a custom claim 'admin' on the user's token.
       return request.auth.token.admin == true;
     }
-
-    // Rules for the 'users' collection
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if request.auth.uid == userId; 
+    
+    // Checks if the user is the author of the video.
+    function isAuthor(videoData) {
+        return request.auth.uid == videoData.author.id;
     }
     
-    // Rules for the 'videos' collection
+    // Checks if the user is assigned to the video.
+    function isAssignedTo(videoData) {
+        return request.auth.uid == videoData.assignedTo.id;
+    }
+
+    // A user has owner-like permissions if they are the author or an admin.
+    function isOwner(videoData) {
+      return isAuthor(videoData) || isAdmin();
+    }
+
+    // =================================
+    // Data Validation Functions
+    // =================================
+    
+    // Validates a UserReference object { id, name }
+    function isValidUserReference(userRef) {
+        return userRef.keys().hasAll(['id', 'name']) &&
+               userRef.id is string && userRef.id != '' &&
+               userRef.name is string && userRef.name != '';
+    }
+
+    // Validates a single Comment object
+    function isValidComment(comment) {
+      return comment.keys().hasAll(['id', 'timecode', 'timecodeFormatted', 'text', 'author', 'createdAt']) &&
+             comment.id is string &&
+             comment.timecode is number &&
+             comment.timecodeFormatted is string &&
+             comment.text is string &&
+             isValidUserReference(comment.author) &&
+             comment.createdAt is string;
+    }
+    
+    // Validates a single Version object
+    function isValidVersion(version) {
+        return version.keys().hasAll(['id', 'versionNumber', 'status', 'createdAt', 'uploader', 'comments', 'annotations', 'isCurrentActive', 'videoUrl']) &&
+               version.id is string &&
+               version.versionNumber is number &&
+               ['pending_review', 'needs_changes', 'approved', 'rejected'].hasAny([version.status]) &&
+               version.createdAt is string &&
+               isValidUserReference(version.uploader) &&
+               version.videoUrl is string &&
+               // All items in the comments list must be valid comments
+               (version.comments is list && version.comments.size() == 0 || version.comments.size() > 0 && version.comments.all(c, isValidComment(c)));
+    }
+    
+    // Validates the entire Video document data for consistency and correctness.
+    function isValidVideoData(videoData) {
+        return videoData.keys().hasAll(['title', 'thumbnailUrl', 'thumbnailHint', 'author', 'assignedTo', 'uploadedAt', 'versions', 'videoUrl']) &&
+               videoData.title is string && videoData.title != '' &&
+               videoData.thumbnailUrl is string &&
+               isValidUserReference(videoData.author) &&
+               isValidUserReference(videoData.assignedTo) &&
+               videoData.uploadedAt is string &&
+               videoData.videoUrl is string &&
+               videoData.versions is list && videoData.versions.size() > 0 &&
+               // All items in the versions list must be valid versions
+               videoData.versions.all(v, isValidVersion(v)) &&
+               // There must be exactly one version marked as the active one, which must match the top-level videoUrl.
+               videoData.versions.filter(v, v.isCurrentActive == true).size() == 1 &&
+               videoData.versions.filter(v, v.isCurrentActive == true)[0].videoUrl == videoData.videoUrl;
+    }
+
+    // =================================
+    // Collection Rules
+    // =================================
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      // Allow a user to create and update their own user document.
+      allow write: if request.auth.uid == userId;
+    }
+    
     match /videos/{videoId} {
+      // Any signed-in user can view a single video or list all videos.
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isSignedIn() && isCreatingVideo();
-      
-      allow update: if isSignedIn() && (
-        isAddingComment(resource.data) ||
-        isChangingVersionStatusByOwner(resource.data) ||
-        isAddingVersionByOwner(resource.data)
-      );
-      
-      function isCreatingVideo() {
-        let videoData = request.resource.data;
-        let versions = videoData.versions;
-        
-        // Check required top-level fields
-        if (!('title' in videoData) || !('thumbnailUrl' in videoData) || !('author' in videoData) || !('assignedTo' in videoData) || !('uploadedAt' in videoData) || !('versions' in videoData) || !('videoUrl' in videoData)) {
-          return false;
-        }
 
-        // Check that there is exactly one version
-        if (versions.size() != 1) {
-            return false;
-        }
-        
-        // Check that the author is the current user
-        if (videoData.author.id != request.auth.uid) {
-          return false;
-        }
+      // Rules for creating a new video document
+      allow create: if isSignedIn() &&
+                       // The creator must be the author.
+                       isAuthor(request.resource.data) &&
+                       // The initial version list must have exactly one version.
+                       request.resource.data.versions.size() == 1 &&
+                       // That first version must be version number 1.
+                       request.resource.data.versions[0].versionNumber == 1 &&
+                       // The uploader of the first version must be the author.
+                       request.resource.data.versions[0].uploader.id == request.auth.uid &&
+                       // The entire document data must be valid.
+                       isValidVideoData(request.resource.data);
 
-        let firstVersion = versions[0];
-        
-        // Verify the new version uploader is the current user
-        return firstVersion.uploader.id == request.auth.uid &&
-               firstVersion.versionNumber == 1 &&
-               firstVersion.status == 'pending_review' &&
-               firstVersion.isCurrentActive == true;
-      }
-      
-      function isAddingComment(videoData) {
-        let videoBefore = resource.data;
-        let videoAfter = request.resource.data;
-        
-        // Ensure no other fields are changed besides the 'versions' array
-        let otherFieldsUnchanged = videoAfter.keys().removeAll(['versions']).size() == videoBefore.keys().removeAll(['versions']).size()
-          && videoAfter.diff(videoBefore).affectedKeys.removeAll(['versions']).size() == 0;
-          
-        let versionChange = getVersionChange(videoBefore.versions, videoAfter.versions);
-        
-        // Ensure only one version is being changed
-        return otherFieldsUnchanged && versionChange != null && isAddingSingleCommentToVersion(versionChange.before, versionChange.after);
-      }
-      
-      function isAddingSingleCommentToVersion(versionBefore, versionAfter) {
-         let commentsBefore = versionBefore.comments;
-         let commentsAfter = versionAfter.comments;
-         
-         let addedComments = commentsAfter.removed(commentsBefore);
-         let removedComments = commentsBefore.removed(commentsAfter);
-         
-         // Ensure only one comment is added, and none are removed.
-         return addedComments.size() == 1 && removedComments.size() == 0 &&
-                // Ensure the new comment author is the current user.
-                addedComments[0].author.id == request.auth.uid &&
-                // Ensure no other fields in the version were changed.
-                versionAfter.diff(versionBefore).affectedKeys.removeAll(['comments']).size() == 0;
-      }
-      
-      function isChangingVersionStatusByOwner(videoData) {
-        if (!isOwner(videoData)) {
-          return false;
-        }
-        
-        let videoBefore = resource.data;
-        let videoAfter = request.resource.data;
+      // Rules for updating an existing video document
+      allow update: if isSignedIn() &&
+                       // The author of the video cannot be changed.
+                       resource.data.author.id == request.resource.data.author.id &&
+                       // The video title cannot be changed.
+                       resource.data.title == request.resource.data.title &&
+                       // The entire updated document data must be valid.
+                       isValidVideoData(request.resource.data) &&
+                       // The person making the change must be the owner (author/admin) or the person it's assigned to.
+                       (isOwner(resource.data) || isAssignedTo(resource.data));
 
-        let otherFieldsUnchanged = videoAfter.keys().removeAll(['versions']).size() == videoBefore.keys().removeAll(['versions']).size()
-          && videoAfter.diff(videoBefore).affectedKeys.removeAll(['versions']).size() == 0;
-
-        let versionChange = getVersionChange(videoBefore.versions, videoAfter.versions);
-
-        return otherFieldsUnchanged && versionChange != null && isOnlyStatusOrActiveChanged(versionChange.before, versionChange.after);
-      }
-
-      function isOnlyStatusOrActiveChanged(versionBefore, versionAfter) {
-        let changedKeys = versionAfter.diff(versionBefore).affectedKeys;
-        // Only 'status' and/or 'isCurrentActive' are allowed to change
-        return changedKeys.hasAny(['status', 'isCurrentActive']) && changedKeys.removeAll(['status', 'isCurrentActive']).size() == 0;
-      }
-      
-      function isAddingVersionByOwner(videoData) {
-        if (!isOwner(videoData)) {
-            return false;
-        }
-
-        let videoBefore = resource.data;
-        let videoAfter = request.resource.data;
-        
-        // Ensure only 'versions' and 'uploadedAt' fields are being changed
-        let allowedKeys = ['versions', 'uploadedAt'];
-        if (videoAfter.diff(videoBefore).affectedKeys.removeAll(allowedKeys).size() != 0) {
-            return false;
-        }
-        
-        let versionsBefore = videoBefore.versions;
-        let versionsAfter = videoAfter.versions;
-
-        // Check that one version was added
-        if (versionsAfter.size() != versionsBefore.size() + 1) {
-            return false;
-        }
-        
-        let newVersion = versionsAfter[versionsAfter.size() - 1];
-        let latestVersionNumber = versionsBefore[versionsBefore.size() - 1].versionNumber;
-
-        // Verify the new version uploader is the current user
-        return newVersion.uploader.id == request.auth.uid &&
-               newVersion.versionNumber == latestVersionNumber + 1 &&
-               newVersion.status == 'pending_review' &&
-               newVersion.isCurrentActive == false;
-      }
-      
-      // This function finds the single changed version between two version lists.
-      // It returns an object { before: versionBefore, after: versionAfter } if exactly one version is changed.
-      // It returns null otherwise.
-      function getVersionChange(versionsBefore, versionsAfter) {
-        if (versionsBefore.size() != versionsAfter.size()) {
-          return null;
-        }
-        
-        let changedVersionId = null;
-        let changeCount = 0;
-        
-        // Find changed version ID
-        // This is a simplified check. A more robust implementation might compare hashes of each version object.
-        let changedIndices = [];
-        for (let i = 0; i < versionsBefore.size(); i = i + 1) {
-          if (versionsBefore[i] != versionsAfter[i]) {
-            changedIndices = changedIndices.concat([i]);
-          }
-        }
-        
-        if (changedIndices.size() != 1) {
-          return null; // No change or more than one version changed
-        }
-        
-        let index = changedIndices[0];
-        
-        if (versionsBefore[index].id != versionsAfter[index].id) {
-           return null; // ID changed, which is not allowed.
-        }
-
-        return { before: versionsBefore[index], after: versionsAfter[index] };
-      }
+      // Deletion is not allowed through client-side rules for data integrity.
+      allow delete: if false;
     }
   }
 }
