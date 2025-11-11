@@ -34,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [firestore]);
 
   const { data: videos, loading: videosLoading } = useCollection<Video>(videosQuery);
-
+  
   const sortedVideos = useMemo(() => {
     if (!videos) return [];
     return [...videos].sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
@@ -105,7 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                </Button>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex-1 flex flex-col min-h-screen ml-[3rem] group-data-[state=expanded]/sidebar-wrapper:ml-[16rem] transition-[margin-left] duration-200">
+        <div className="flex-1 flex flex-col ml-[3rem] group-data-[state=expanded]/sidebar-wrapper:ml-[16rem] transition-[margin-left] duration-200">
           {children}
         </div>
       </SidebarProvider>
