@@ -19,6 +19,10 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && getUserData(request.auth.uid).role == 'admin';
     }
+    
+    function isAssignedEmployee(videoData) {
+      return isSignedIn() && videoData.assignedTo.id == request.auth.uid;
+    }
 
     // Rules for the 'users' collection
     match /users/{userId} {
@@ -33,7 +37,7 @@ service cloud.firestore {
       
       // Allow updates (like adding comments, changing status, or adding a version)
       allow update: if isSignedIn() && (
-        isAddingComment() ||
+        isAddingComment(resource.data) ||
         isChangingVersionStatusByAdmin() ||
         isAddingVersion()
       );
@@ -56,11 +60,16 @@ service cloud.firestore {
         
         // Verify the new version uploader is the current user
         return firstVersion.uploader.id == request.auth.uid &&
+               firstVersion.versionNumber == 1 &&
                firstVersion.status == 'pending_review' &&
                firstVersion.isCurrentActive == true;
       }
       
-      function isAddingComment() {
+      function isAddingComment(videoData) {
+        if (!isAssignedEmployee(videoData) && !isAdmin()) {
+          return false;
+        }
+        
         let videoBefore = resource.data;
         let videoAfter = request.resource.data;
         
@@ -130,9 +139,11 @@ service cloud.firestore {
         }
         
         let newVersion = versionsAfter[versionsAfter.size() - 1];
+        let latestVersionNumber = versionsBefore[versionsBefore.size() - 1].versionNumber;
 
         // Verify the new version uploader is the current user
         return newVersion.uploader.id == request.auth.uid &&
+               newVersion.versionNumber == latestVersionNumber + 1 &&
                newVersion.status == 'pending_review' &&
                newVersion.isCurrentActive == false;
       }

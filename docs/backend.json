@@ -148,9 +148,6 @@
         },
         "videoUrl": {
           "type": "string"
-        },
-        "videoDataUri": {
-            "type": "string"
         }
       },
       "required": ["id", "title", "thumbnailUrl", "assignedTo", "uploadedAt", "versions", "videoUrl"]
