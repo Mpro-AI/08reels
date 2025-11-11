@@ -93,33 +93,20 @@ export default function VideoPage() {
 
     const updatedVideos = videos.map(v => {
       if (v.id === video.id) {
-        let isNewActiveVersion = false;
+        let isNewActiveVersion = status === 'approved';
+
         const newVersions = v.versions.map(ver => {
-          // If setting a version to approved, it becomes the new active version
-          if (status === 'approved' && ver.id === versionId) {
-            isNewActiveVersion = true;
-            return { ...ver, status: 'approved', isCurrentActive: true };
-          }
           if (ver.id === versionId) {
-             return { ...ver, status: status, isCurrentActive: false };
+            return { ...ver, status, isCurrentActive: isNewActiveVersion };
+          }
+          // If a new version is approved, all other versions are no longer active
+          if (isNewActiveVersion) {
+            return { ...ver, isCurrentActive: false };
           }
           return ver;
         });
 
-        // If a new active version was set, unset all others
-        if (isNewActiveVersion) {
-          return {
-            ...v,
-            versions: newVersions.map(ver => {
-              if(ver.id !== versionId) {
-                return { ...ver, isCurrentActive: false };
-              }
-              return ver;
-            })
-          };
-        } else {
-          return { ...v, versions: newVersions };
-        }
+        return { ...v, versions: newVersions };
       }
       return v;
     });
