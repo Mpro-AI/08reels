@@ -8,10 +8,12 @@ import {
   Firestore,
   runTransaction,
   collection,
+  writeBatch,
 } from 'firebase/firestore';
-import type { Video, Comment, VersionStatus, User } from '@/lib/types';
+import type { Video, Comment, VersionStatus, User, Version } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function setVideo(
   db: Firestore,
@@ -61,6 +63,7 @@ export function addCommentToVersion(
 
     transaction.update(videoRef, { versions: newVersions });
   }).catch((e) => {
+    console.error("Transaction failed: ", e);
     const permissionError = new FirestorePermissionError({
       path: videoRef.path,
       operation: 'update',
@@ -100,6 +103,7 @@ export function setVersionStatus(
         transaction.update(videoRef, { versions: newVersions });
 
     }).catch((e) => {
+        console.error("Transaction failed: ", e);
         const permissionError = new FirestorePermissionError({
             path: videoRef.path,
             operation: 'update',
@@ -107,4 +111,94 @@ export function setVersionStatus(
         });
         errorEmitter.emit('permission-error', permissionError);
     });
+}
+
+export async function addVersionToVideo(
+    db: Firestore,
+    videoId: string,
+    videoDataUri: string,
+    uploader: Pick<User, 'id' | 'name'>
+  ) {
+    const videoRef = doc(db, 'videos', videoId);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const videoDoc = await transaction.get(videoRef);
+        if (!videoDoc.exists()) {
+          throw 'Video does not exist!';
+        }
+  
+        const video = videoDoc.data() as Video;
+        const latestVersionNumber = video.versions.reduce((max, v) => Math.max(max, v.versionNumber), 0);
+  
+        const newVersion: Version = {
+          id: doc(collection(db, 'videos')).id,
+          versionNumber: latestVersionNumber + 1,
+          status: 'pending_review',
+          createdAt: Timestamp.now().toDate().toISOString(),
+          uploader,
+          comments: [],
+          annotations: [],
+          isCurrentActive: false,
+          videoUrl: videoDataUri,
+        };
+  
+        const newVersions = [...video.versions, newVersion];
+        transaction.update(videoRef, { versions: newVersions });
+      });
+    } catch (e) {
+      console.error('Transaction failed: ', e);
+      const permissionError = new FirestorePermissionError({
+        path: videoRef.path,
+        operation: 'update',
+        requestResourceData: { newVersion: '...' },
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      throw e; // Re-throw the error to be caught by the caller
+    }
+}
+
+export async function addVideo(
+    db: Firestore,
+    newVideoData: { title: string; videoDataUri: string, assignedTo: Pick<User, 'id' | 'name'> },
+    uploader: Pick<User, 'id' | 'name'>
+) {
+    const videoRef = doc(collection(db, 'videos'));
+    try {
+        const firstVersion: Version = {
+            id: doc(collection(db, 'videos')).id,
+            versionNumber: 1,
+            status: 'pending_review',
+            createdAt: Timestamp.now().toDate().toISOString(),
+            uploader,
+            comments: [],
+            annotations: [],
+            isCurrentActive: true,
+            videoUrl: newVideoData.videoDataUri,
+        };
+        
+        // Get a random placeholder image
+        const placeholder = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+
+        const newVideo: Omit<Video, 'id'> = {
+            title: newVideoData.title,
+            thumbnailUrl: placeholder.imageUrl,
+            thumbnailHint: placeholder.imageHint,
+            assignedTo: newVideoData.assignedTo,
+            uploadedAt: Timestamp.now().toDate().toISOString(),
+            versions: [firstVersion],
+            videoUrl: newVideoData.videoDataUri, // For simplicity, the main videoUrl is the first version's URL
+        };
+
+        await setDoc(videoRef, newVideo);
+
+    } catch (e) {
+        console.error('Add video failed: ', e);
+        const permissionError = new FirestorePermissionError({
+            path: videoRef.path,
+            operation: 'create',
+            requestResourceData: newVideoData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw e; // Re-throw the error to be caught by the caller
+    }
 }

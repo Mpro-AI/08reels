@@ -1,8 +1,9 @@
 'use client';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Version, VersionStatus } from '@/lib/types';
+import { Version, VersionStatus, Video } from '@/lib/types';
 import { GitBranch, Check, X, Edit, Upload, Star } from 'lucide-react';
 import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { format } from 'date-fns';
@@ -18,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { UploadVideoDialog } from './upload-video-dialog';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: React.ReactNode }> = {
     approved: { text: '已核可', variant: 'default', icon: <Check className="size-3" /> },
@@ -27,6 +29,7 @@ const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'sec
   };
 
 interface VersionSectionProps {
+    video: Video;
     versions: Version[];
     selectedVersionId: string;
     onVersionChange: (versionId: string) => void;
@@ -72,8 +75,9 @@ const StatusButton = ({
 )
 
 
-export default function VersionSection({ versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
+export default function VersionSection({ video, versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
     const { user } = useAppAuth();
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   return (
     <Card className="border-0 shadow-none">
@@ -81,10 +85,17 @@ export default function VersionSection({ versions, selectedVersionId, onVersionC
         <CardTitle className="text-base">版本控制</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button className="w-full">
-            <Upload className="mr-2 h-4 w-4"/>
-            提交新版本
-        </Button>
+        <UploadVideoDialog 
+            isOpen={isUploadOpen} 
+            onOpenChange={setIsUploadOpen}
+            video={video}
+        >
+            <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
+                <Upload className="mr-2 h-4 w-4"/>
+                提交新版本
+            </Button>
+        </UploadVideoDialog>
+
         <div className="space-y-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
             {versions.sort((a,b) => b.versionNumber - a.versionNumber).map(version => {
                 const statusInfo = statusMap[version.status];

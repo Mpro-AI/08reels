@@ -26,7 +26,8 @@ export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
   const firestore = useFirestore();
-
+  const { user } = useAppAuth();
+  
   const videoRef = useMemo(() => {
     if (!firestore || !videoId) return null;
     return doc(firestore, 'videos', videoId);
@@ -37,7 +38,6 @@ export default function VideoPage() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
   const playerRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const { user } = useAppAuth();
   const { toast } = useToast();
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
@@ -121,7 +121,7 @@ export default function VideoPage() {
             <Header title={video.title} />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center">
-                    <VideoPlayer src={selectedVersion.videoUrl || video.videoUrl} videoRef={playerRef} />
+                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} />
                 </div>
                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
                     <SidePanel 
