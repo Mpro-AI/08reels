@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Version, VersionStatus, Video } from '@/lib/types';
-import { GitBranch, Check, X, Edit, Upload, Star } from 'lucide-react';
+import { GitBranch, Check, X, Edit, Upload, Star, StickyNote } from 'lucide-react';
 import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -131,6 +131,12 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
                             <p>上傳者：{version.uploader.name}</p>
                             <p>時間：{format(new Date(version.createdAt), 'yyyy-MM-dd HH:mm')}</p>
                         </div>
+                        {version.notes && (
+                            <div className="text-sm text-foreground bg-muted/50 p-2 rounded-md flex items-start gap-2">
+                                <StickyNote className="size-4 mt-0.5 shrink-0" />
+                                <p className="whitespace-pre-wrap">{version.notes}</p>
+                            </div>
+                        )}
                         {user?.role === 'admin' && version.status === 'pending_review' && (
                             <div className="grid grid-cols-3 gap-2 pt-2">
                                 <StatusButton

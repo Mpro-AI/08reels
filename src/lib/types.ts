@@ -36,6 +36,7 @@ export type Version = {
   annotations: Annotation[];
   isCurrentActive: boolean;
   videoUrl: string;
+  notes?: string;
 };
 
 export type Video = {
