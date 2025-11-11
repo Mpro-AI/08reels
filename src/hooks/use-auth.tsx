@@ -21,31 +21,24 @@ const mockUsers: User[] = [
     { id: 'user-employee-b', name: '員工 B', role: 'employee', pin: '9564' },
 ];
 
-const getInitialUser = () => {
-    if (typeof window === 'undefined') return null;
-    // Automatically log in as admin for developer mode
-    const adminUser = mockUsers.find(u => u.role === 'admin');
-    return adminUser || null;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // This effect now only runs once on mount to set the initial user
-    setUser(getInitialUser());
+    // On initial load, we can check if a user is saved in localStorage,
+    // but for now, we'll start with no user.
     setLoading(false);
   }, []);
   
   const isAuthenticated = !!user;
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
+    setLoading(true);
     const foundUser = mockUsers.find(u => u.pin === pin);
     
     if (foundUser) {
-      setLoading(true);
       setUser(foundUser);
       toast({
         title: `歡迎， ${foundUser.name}`,
@@ -59,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: '登入失敗',
         description: 'PIN 碼錯誤，請重試。',
       });
+      setLoading(false);
       return false;
     }
   }, [toast]);
