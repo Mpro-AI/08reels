@@ -1,0 +1,69 @@
+'use client';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { User, UserRole } from '@/lib/types';
+import { users } from '@/lib/mock-data';
+
+interface AuthContextType {
+  isAuthenticated: boolean;
+  user: User | null;
+  login: (pin: string) => boolean;
+  logout: () => void;
+  setUserRole: (role: UserRole) => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Mock PINs for demo purposes
+const PINS: Record<string, User> = {
+  '123456': users.find(u => u.role === 'admin')!,
+  '1111': users.find(u => u.role === 'employee' && u.name === '員工 A')!,
+  '2222': users.find(u => u.role === 'employee' && u.name === '員工 B')!,
+};
+
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const { toast } = useToast();
+
+  const login = useCallback((pin: string): boolean => {
+    const matchedUser = PINS[pin];
+    if (matchedUser) {
+      setUser(matchedUser);
+      return true;
+    } else {
+      // Simulate brute-force lockout
+      toast({
+        variant: "destructive",
+        title: "登入失敗",
+        description: "PIN 錯誤，請重試。",
+      });
+      return false;
+    }
+  }, [toast]);
+
+  const logout = useCallback(() => {
+    setUser(null);
+  }, []);
+  
+  const setUserRole = useCallback((role: UserRole) => {
+    const newUser = users.find(u => u.role === role);
+    if(newUser) {
+      setUser(newUser);
+    }
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, setUserRole }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
