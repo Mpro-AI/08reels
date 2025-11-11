@@ -19,8 +19,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { UploadVideoDialog } from './upload-video-dialog';
-import { DialogTrigger } from '../ui/dialog';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: React.ReactNode }> = {
     approved: { text: '已核可', variant: 'default', icon: <Check className="size-3" /> },
@@ -78,7 +76,6 @@ const StatusButton = ({
 
 export default function VersionSection({ video, versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
     const { user } = useAuth();
-    const [isUploadOpen, setIsUploadOpen] = useState(false);
     const isOwner = user?.id === video.author.id;
 
   return (
@@ -87,21 +84,6 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
         <CardTitle className="text-base">版本控制</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isOwner && (
-            <UploadVideoDialog 
-                isOpen={isUploadOpen} 
-                onOpenChange={setIsUploadOpen}
-                video={video}
-            >
-                <DialogTrigger asChild>
-                    <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
-                        <Upload className="mr-2 h-4 w-4"/>
-                        提交新版本
-                    </Button>
-                </DialogTrigger>
-            </UploadVideoDialog>
-        )}
-
         <div className="space-y-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
             {versions.sort((a,b) => b.versionNumber - a.versionNumber).map(version => {
                 const statusInfo = statusMap[version.status];

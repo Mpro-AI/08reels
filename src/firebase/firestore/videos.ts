@@ -116,55 +116,6 @@ export function setVersionStatus(
     });
 }
 
-export async function addVersionToVideo(
-    db: Firestore,
-    videoId: string,
-    videoUrl: string,
-    uploader: Pick<User, 'id' | 'name'>,
-    notes?: string,
-  ) {
-    const videoRef = doc(db, 'videos', videoId);
-    try {
-      await runTransaction(db, async (transaction) => {
-        const videoDoc = await transaction.get(videoRef);
-        if (!videoDoc.exists()) {
-          throw 'Video does not exist!';
-        }
-  
-        const video = videoDoc.data() as Video;
-        const latestVersionNumber = video.versions.reduce((max, v) => Math.max(max, v.versionNumber), 0);
-  
-        const newVersion: Version = {
-          id: doc(collection(db, 'dummy')).id,
-          versionNumber: latestVersionNumber + 1,
-          status: 'pending_review',
-          createdAt: Timestamp.now().toDate().toISOString(),
-          uploader,
-          comments: [],
-          annotations: [],
-          isCurrentActive: false,
-          videoUrl: videoUrl,
-          notes,
-        };
-  
-        const newVersions = [...video.versions, newVersion];
-        transaction.update(videoRef, { 
-            versions: newVersions,
-            uploadedAt: Timestamp.now().toDate().toISOString() 
-        });
-      });
-    } catch (e) {
-      console.error('Transaction failed: ', e);
-      const permissionError = new FirestorePermissionError({
-        path: videoRef.path,
-        operation: 'update',
-        requestResourceData: { newVersion: '...' },
-      });
-      errorEmitter.emit('permission-error', permissionError);
-      throw e; // Re-throw the error to be caught by the caller
-    }
-}
-
 export async function addVideo(
     db: Firestore,
     videoId: string,

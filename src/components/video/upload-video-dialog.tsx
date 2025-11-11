@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { Video, User } from '@/lib/types';
-import { addVersionToVideo, addVideo } from '@/firebase/firestore/videos';
+import { addVideo } from '@/firebase/firestore/videos';
 import { useFirestore, useCollection } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { uploadVideoAndGetUrl } from '@/firebase/storage';
@@ -25,14 +25,13 @@ import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { collection } from 'firebase/firestore';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
 
 const formSchema = z.object({
-  title: z.string().optional(),
+  title: z.string().min(1, '標題為必填欄位'),
   notes: z.string().optional(),
   videoFile: z.instanceof(FileList)
     .refine(files => files?.length > 0, '請選擇一個影片檔案')
@@ -46,13 +45,12 @@ const formSchema = z.object({
 type UploadVideoForm = z.infer<typeof formSchema>;
 
 interface UploadVideoDialogProps {
-  video?: Video;
   children: ReactNode;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: UploadVideoDialogProps) {
+export function UploadVideoDialog({ children, isOpen, onOpenChange }: UploadVideoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
@@ -60,14 +58,8 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   const firestore = useFirestore();
   const storage = useStorage();
 
-  const usersQuery = useMemo(() => firestore ? collection(firestore, 'users') : null, [firestore]);
-  const { data: users, loading: usersLoading } = useCollection<User>(usersQuery);
-
   const form = useForm<UploadVideoForm>({
-    resolver: zodResolver(formSchema.refine(data => video || data.title, {
-      message: "標題為必填欄位",
-      path: ["title"], 
-    })),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
       notes: '',
@@ -103,27 +95,16 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
           storage, 
           videoFile, 
           setUploadProgress,
-          video?.id
         );
 
-        if (video) {
-            await addVersionToVideo(firestore, video.id, downloadURL, { id: user.id, name: user.name }, data.notes);
-            toast({ title: '成功', description: '新版本已成功提交。' });
-        } else {
-            if (!data.title) {
-                toast({ variant: 'destructive', title: '錯誤', description: '請提供影片標題。' });
-                setIsSubmitting(false);
-                return;
-            }
-
-            const newVideoData = {
-                title: data.title,
-                videoUrl: downloadURL,
-                notes: data.notes,
-            };
-            await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
-            toast({ title: '成功', description: '新影片專案已成功建立。' });
-        }
+        const newVideoData = {
+            title: data.title,
+            videoUrl: downloadURL,
+            notes: data.notes,
+        };
+        await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
+        toast({ title: '成功', description: '新影片專案已成功建立。' });
+        
         handleClose();
 
     } catch (error) {
@@ -144,30 +125,26 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
-              <DialogTitle>{video ? `提交新版本至 "${video.title}"` : '上傳新專案影片'}</DialogTitle>
+              <DialogTitle>上傳新專案影片</DialogTitle>
               <DialogDescription>
-                {video ? '請選擇要上傳的新版本影片檔案，並可選填版本備註。' : '請提供影片標題並選擇影片檔案來建立一個新的專案。'}
+                請提供影片標題並選擇影片檔案來建立一個新的專案。
                 <br/>
                 <span className="text-xs text-muted-foreground">僅支援 MP4 / MOV / AVI，單檔上限：1GB。</span>
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              {!video && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem className="grid grid-cols-4 items-center gap-4">
-                        <FormLabel className="text-right">標題</FormLabel>
-                        <FormControl className="col-span-3">
-                          <Input {...field} disabled={isSubmitting} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem className="grid grid-cols-4 items-center gap-4">
+                    <FormLabel className="text-right">標題</FormLabel>
+                    <FormControl className="col-span-3">
+                      <Input {...field} disabled={isSubmitting} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="notes"
@@ -175,7 +152,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                   <FormItem className="grid grid-cols-4 items-start gap-4">
                     <FormLabel className="text-right pt-2">備註</FormLabel>
                     <FormControl className="col-span-3">
-                      <Textarea placeholder="（選填）本次修改重點：燈光與字幕校正" {...field} disabled={isSubmitting}/>
+                      <Textarea placeholder="（選填）影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
                     </FormControl>
                   </FormItem>
                 )}
@@ -212,7 +189,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
-              <Button type="submit" disabled={isSubmitting || usersLoading}>
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
               </Button>
             </DialogFooter>
