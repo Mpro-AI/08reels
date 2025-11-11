@@ -2,9 +2,10 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
-import { useAuth as useFirebaseAuth } from '@/firebase';
+import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 // Import only types at the top level to avoid early initialization
 import type { User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -23,6 +24,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const firebaseAuth = useFirebaseAuth();
+  const firestore = useFirestore();
+
+  const updateUserProfileInFirestore = useCallback(async (firebaseUser: FirebaseUser) => {
+    if (!firestore || !firebaseUser) return;
+    const userRef = doc(firestore, 'users', firebaseUser.uid);
+    const appUser: User = {
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
+      email: firebaseUser.email,
+      photoURL: firebaseUser.photoURL,
+    };
+    try {
+      await setDoc(userRef, appUser, { merge: true });
+    } catch (error) {
+      console.error("Failed to update user profile in Firestore", error);
+    }
+    return appUser;
+  }, [firestore]);
+
 
   useEffect(() => {
     if (!firebaseAuth) {
@@ -34,14 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const { onAuthStateChanged } = await import('firebase/auth');
 
-            const handleUser = (firebaseUser: FirebaseUser | null) => {
+            const handleUser = async (firebaseUser: FirebaseUser | null) => {
                 if (firebaseUser) {
-                    const appUser: User = {
-                        id: firebaseUser.uid,
-                        name: firebaseUser.displayName || firebaseUser.email || 'Anonymous',
-                        email: firebaseUser.email,
-                        photoURL: firebaseUser.photoURL,
-                    };
+                    const appUser = await updateUserProfileInFirestore(firebaseUser);
                     setUser(appUser);
                 } else {
                     setUser(null);
@@ -68,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             unsubscribe();
         }
     };
-  }, [firebaseAuth, toast]);
+  }, [firebaseAuth, toast, updateUserProfileInFirestore]);
   
   const isAuthenticated = !!user;
 
@@ -82,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(firebaseAuth, provider);
+      await updateUserProfileInFirestore(result.user);
       toast({
         title: `歡迎回來, ${result.user.displayName}`,
         description: `您已使用 Google 帳號成功登入。`,
@@ -100,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        setLoading(false);
        return false;
     }
-  }, [firebaseAuth, toast]);
+  }, [firebaseAuth, toast, updateUserProfileInFirestore]);
 
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
     if (!firebaseAuth) {
@@ -110,7 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const { signInWithEmailAndPassword } = await import('firebase/auth');
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await updateUserProfileInFirestore(result.user);
       toast({ title: '登入成功' });
       return true;
     } catch (error: any) {
@@ -125,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false); // Make sure to set loading false on error
       return false;
     }
-  }, [firebaseAuth, toast]);
+  }, [firebaseAuth, toast, updateUserProfileInFirestore]);
 
   const signupWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
     if (!firebaseAuth) {
@@ -135,9 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const { createUserWithEmailAndPassword } = await import('firebase/auth');
-      await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      const result = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      await updateUserProfileInFirestore(result.user);
       toast({ title: '註冊成功', description: '歡迎加入！您現在可以登入。' });
-      // setLoading is handled by onAuthStateChanged
       return true;
     } catch (error: any) {
       console.error("Email sign-up failed", error);
@@ -155,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false); // Make sure to set loading false on error
       return false;
     }
-  }, [firebaseAuth, toast]);
+  }, [firebaseAuth, toast, updateUserProfileInFirestore]);
 
   const logout = useCallback(async () => {
     if (!firebaseAuth) return;

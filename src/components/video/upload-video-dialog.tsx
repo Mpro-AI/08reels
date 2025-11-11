@@ -183,9 +183,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                     render={({ field }) => (
                       <FormItem className="grid grid-cols-4 items-center gap-4">
                         <FormLabel className="text-right">指派給</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isSubmitting || usersLoading}>
                           <FormControl className="col-span-3">
-                            <SelectTrigger disabled={isSubmitting || usersLoading}>
+                            <SelectTrigger>
                               <SelectValue placeholder={usersLoading ? "載入中..." : "選擇一位使用者"} />
                             </SelectTrigger>
                           </FormControl>
