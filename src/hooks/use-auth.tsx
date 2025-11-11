@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
         try {
-            const { onAuthStateChanged, getRedirectResult } = await import('firebase/auth');
+            const { onAuthStateChanged } = await import('firebase/auth');
 
             const handleUser = (firebaseUser: FirebaseUser | null) => {
                 if (firebaseUser) {
@@ -50,26 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
 
             const unsubscribe = onAuthStateChanged(firebaseAuth, handleUser);
-
-            getRedirectResult(firebaseAuth)
-              .then((result) => {
-                if (result) {
-                  toast({
-                    title: `歡迎回來, ${result.user.displayName}`,
-                    description: `您已使用 Google 帳號成功登入。`,
-                  });
-                }
-              })
-              .catch((error) => {
-                console.error("Google redirect result error", error);
-                if (error.code !== 'auth/api-key-not-valid' && error.code !== 'auth/invalid-api-key') {
-                  toast({
-                    variant: 'destructive',
-                    title: '登入失敗',
-                    description: '處理您的登入資訊時發生錯誤。',
-                  });
-                }
-              });
     
             return unsubscribe;
 
@@ -99,13 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+      const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(firebaseAuth, provider);
+      const result = await signInWithPopup(firebaseAuth, provider);
+      toast({
+        title: `歡迎回來, ${result.user.displayName}`,
+        description: `您已使用 Google 帳號成功登入。`,
+      });
+      // setLoading is handled by onAuthStateChanged
       return true;
     } catch (error: any) {
-       console.error("Google sign-in redirect failed", error);
-       toast({ variant: 'destructive', title: '登入失敗', description: '無法啟動 Google 登入流程，請稍後再試。' });
+       console.error("Google sign-in popup failed", error);
+       let description = '無法使用 Google 登入，請稍後再試。';
+       if (error.code === 'auth/popup-closed-by-user') {
+        description = '登入視窗已關閉，請重試。';
+       } else if (error.code === 'auth/unauthorized-domain') {
+        description = '此應用程式網域未被授權，請聯絡管理員。'
+       }
+       toast({ variant: 'destructive', title: '登入失敗', description });
        setLoading(false);
        return false;
     }

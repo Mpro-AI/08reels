@@ -47,6 +47,11 @@ export function LoginForm() {
     },
   });
 
+  const redirectToDashboard = () => {
+    const redirectUrl = searchParams.get('redirect') || '/';
+    router.push(redirectUrl);
+  };
+
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     const success = await loginWithGoogle();
@@ -55,11 +60,6 @@ export function LoginForm() {
     } else {
       setIsGoogleLoading(false);
     }
-  };
-
-  const redirectToDashboard = () => {
-    const redirectUrl = searchParams.get('redirect') || '/';
-    router.push(redirectUrl);
   };
   
   const onSubmit = async (data: UserFormValue) => {
