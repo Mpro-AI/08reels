@@ -46,5 +46,5 @@ export type Video = {
   assignedTo: Pick<User, 'id' | 'name'>;
   uploadedAt: string;
   versions: Version[];
-  videoUrl: string;
+  videoUrl: string; // The URL of the currently active video version for quick access
 };

@@ -56,6 +56,7 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
             </TabsContent>
             <TabsContent value="versions" className="m-0">
                 <VersionSection 
+                  video={video}
                   versions={video.versions} 
                   selectedVersionId={selectedVersion.id}
                   onVersionChange={onVersionChange}
@@ -65,7 +66,8 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
             <TabsContent value="ai" className="m-0">
                 {user?.role === 'admin' && (
                   <AiSuggestionSection 
-                    video={video} 
+                    video={video}
+                    selectedVersion={selectedVersion}
                     onSuggestionClick={onTimecodeClick}
                     onAddComment={onAddComment}
                     onEditComment={handleSuggestionToComment}

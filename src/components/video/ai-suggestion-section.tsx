@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { suggestAnnotationsWithAI, type SuggestAnnotationsWithAIOutput } from '@/ai/flows/suggest-annotations-with-ai';
-import { Video } from '@/lib/types';
+import { Video, Version } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 interface AiSuggestionSectionProps {
   video: Video;
+  selectedVersion: Version;
   onSuggestionClick: (timecode: number) => void;
   onAddComment: (commentText: string, timecode: number) => void;
   onEditComment: (commentText: string) => void;
@@ -17,13 +18,13 @@ interface AiSuggestionSectionProps {
 
 type Suggestion = SuggestAnnotationsWithAIOutput['suggestions'][0] & { id: number };
 
-export default function AiSuggestionSection({ video, onSuggestionClick, onAddComment, onEditComment }: AiSuggestionSectionProps) {
+export default function AiSuggestionSection({ video, selectedVersion, onSuggestionClick, onAddComment, onEditComment }: AiSuggestionSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const { toast } = useToast();
 
   const handleGetSuggestions = async () => {
-    if (!video.videoDataUri) {
+    if (!selectedVersion.videoUrl) {
       toast({
         variant: 'destructive',
         title: '缺少影片資料',
@@ -35,7 +36,7 @@ export default function AiSuggestionSection({ video, onSuggestionClick, onAddCom
     setIsLoading(true);
     setSuggestions(null);
     try {
-      const result = await suggestAnnotationsWithAI({ videoDataUri: video.videoDataUri });
+      const result = await suggestAnnotationsWithAI({ videoDataUri: selectedVersion.videoUrl });
       setSuggestions(result.suggestions.map((s, i) => ({...s, id: i})));
     } catch (error) {
       console.error('AI suggestion error:', error);

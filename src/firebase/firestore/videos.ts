@@ -100,7 +100,11 @@ export function setVersionStatus(
             return v;
         });
 
-        transaction.update(videoRef, { versions: newVersions });
+        const activeVideoUrl = isNewActiveVersion 
+          ? newVersions.find(v => v.id === versionId)!.videoUrl 
+          : video.videoUrl;
+
+        transaction.update(videoRef, { versions: newVersions, videoUrl: activeVideoUrl });
 
     }).catch((e) => {
         console.error("Transaction failed: ", e);
@@ -143,7 +147,10 @@ export async function addVersionToVideo(
         };
   
         const newVersions = [...video.versions, newVersion];
-        transaction.update(videoRef, { versions: newVersions });
+        transaction.update(videoRef, { 
+            versions: newVersions,
+            uploadedAt: Timestamp.now().toDate().toISOString() 
+        });
       });
     } catch (e) {
       console.error('Transaction failed: ', e);
@@ -186,7 +193,7 @@ export async function addVideo(
             assignedTo: newVideoData.assignedTo,
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
-            videoUrl: newVideoData.videoDataUri, // For simplicity, the main videoUrl is the first version's URL
+            videoUrl: newVideoData.videoDataUri,
         };
 
         await setDoc(videoRef, newVideo);

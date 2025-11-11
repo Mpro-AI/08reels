@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { UploadVideoDialog } from './upload-video-dialog';
+import { DialogTrigger } from '../ui/dialog';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: React.ReactNode }> = {
     approved: { text: '已核可', variant: 'default', icon: <Check className="size-3" /> },
@@ -90,10 +91,12 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
             onOpenChange={setIsUploadOpen}
             video={video}
         >
-            <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
-                <Upload className="mr-2 h-4 w-4"/>
-                提交新版本
-            </Button>
+            <DialogTrigger asChild>
+                <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4"/>
+                    提交新版本
+                </Button>
+            </DialogTrigger>
         </UploadVideoDialog>
 
         <div className="space-y-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
