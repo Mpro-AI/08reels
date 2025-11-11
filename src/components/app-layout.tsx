@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useMemo, createContext } from 'react';
+import React, { useEffect, useMemo, createContext, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
@@ -10,15 +10,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
-import type { Video, User } from '@/lib/types';
+import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {
   videos: Video[] | null;
+  setVideos: React.Dispatch<React.SetStateAction<Video[] | null>>;
   loading: boolean;
 }
 
 export const AppLayoutContext = createContext<AppLayoutContextType>({
   videos: null,
+  setVideos: () => {},
   loading: true,
 });
 
@@ -36,7 +38,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }, [firestore, isAuthenticated]);
 
-  const { data: videos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
+  const { data: initialVideos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
+  const [videos, setVideos] = useState<Video[] | null>(null);
+
+  useEffect(() => {
+    if (initialVideos) {
+      setVideos(initialVideos);
+    }
+  }, [initialVideos]);
   
   const filteredVideos = useMemo(() => {
     if (!videos || !user) return [];
@@ -56,14 +65,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🎬 Videos loading:', videosLoading);
-      console.log('🎬 Videos data:', videos);
+      console.log('🎬 Initial Videos data:', initialVideos);
       console.log('🎬 Filtered videos data:', filteredVideos);
       console.log('🎬 Videos error:', error);
       console.log('🎬 Firestore:', firestore ? 'Connected' : 'Not connected');
       console.log('🎬 Authenticated:', isAuthenticated);
       console.log('👤 Current user:', user);
     }
-  }, [videos, filteredVideos, videosLoading, error, firestore, isAuthenticated, user]);
+  }, [initialVideos, filteredVideos, videosLoading, error, firestore, isAuthenticated, user]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -83,7 +92,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <AppLayoutContext.Provider value={{ videos: filteredVideos, loading: videosLoading }}>
+    <AppLayoutContext.Provider value={{ videos: filteredVideos, setVideos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">

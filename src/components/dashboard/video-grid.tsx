@@ -2,26 +2,16 @@ import VideoCard from './video-card';
 import { Video } from '@/lib/types';
 import { FolderKanban } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
-import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface VideoGridProps {
   videos: Video[];
   loading?: boolean;
+  onVideoDeleted: (videoId: string) => void;
 }
 
-export default function VideoGrid({ videos: initialVideos, loading = false }: VideoGridProps) {
-  const [videos, setVideos] = useState(initialVideos);
+export default function VideoGrid({ videos, loading = false, onVideoDeleted }: VideoGridProps) {
 
-  // Update state if initialVideos prop changes
-  useState(() => {
-    setVideos(initialVideos);
-  }, [initialVideos]);
-
-  const handleVideoDeleted = (videoId: string) => {
-    setVideos(prevVideos => prevVideos.filter(v => v.id !== videoId));
-  };
-  
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -60,7 +50,7 @@ export default function VideoGrid({ videos: initialVideos, loading = false }: Vi
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.3 }}
           >
-            <VideoCard video={video} onVideoDeleted={handleVideoDeleted} />
+            <VideoCard video={video} onVideoDeleted={onVideoDeleted} />
           </motion.div>
         ))}
       </AnimatePresence>
