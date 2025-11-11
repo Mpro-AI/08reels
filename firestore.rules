@@ -29,14 +29,13 @@ service cloud.firestore {
     // Rules for the 'videos' collection
     match /videos/{videoId} {
       allow read: if isSignedIn();
-      allow create: if false; // For this app, client-side video creation is disabled.
+      allow create: if isSignedIn();
       
-      // Allow updates (like adding comments or changing status)
+      // Allow updates (like adding comments, changing status, or adding a version)
       allow update: if isSignedIn() && (
-        // Allow anyone signed in to add a comment
         isAddingComment() ||
-        // Allow only admins to change version status
-        isChangingVersionStatusByAdmin()
+        isChangingVersionStatusByAdmin() ||
+        isAddingVersion()
       );
       
       function isAddingComment() {
@@ -88,6 +87,32 @@ service cloud.firestore {
         let changedKeys = versionAfter.diff(versionBefore).affectedKeys;
         // Only 'status' and/or 'isCurrentActive' are allowed to change
         return changedKeys.hasAny(['status', 'isCurrentActive']) && changedKeys.removeAll(['status', 'isCurrentActive']).size() == 0;
+      }
+      
+      function isAddingVersion() {
+        let videoBefore = resource.data;
+        let videoAfter = request.resource.data;
+        
+        // Ensure only 'versions' and 'uploadedAt' fields are being changed
+        let allowedKeys = ['versions', 'uploadedAt'];
+        if (videoAfter.diff(videoBefore).affectedKeys.removeAll(allowedKeys).size() != 0) {
+            return false;
+        }
+        
+        let versionsBefore = videoBefore.versions;
+        let versionsAfter = videoAfter.versions;
+
+        // Check that one version was added
+        if (versionsAfter.size() != versionsBefore.size() + 1) {
+            return false;
+        }
+        
+        let newVersion = versionsAfter[versionsAfter.size() - 1];
+
+        // Verify the new version uploader is the current user
+        return newVersion.uploader.id == request.auth.uid &&
+               newVersion.status == 'pending_review' &&
+               newVersion.isCurrentActive == false;
       }
       
       // This function finds the single changed version between two version lists.
