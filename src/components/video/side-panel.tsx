@@ -70,7 +70,7 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
                     selectedVersion={selectedVersion}
                     onSuggestionClick={onTimecodeClick}
                     onAddComment={onAddComment}
-                    onEditComment={handleSuggestionToComment}
+                    onEditSuggestion={handleSuggestionToComment}
                   />
                 )}
             </TabsContent>

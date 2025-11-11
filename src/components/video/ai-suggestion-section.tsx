@@ -13,12 +13,12 @@ interface AiSuggestionSectionProps {
   selectedVersion: Version;
   onSuggestionClick: (timecode: number) => void;
   onAddComment: (commentText: string, timecode: number) => void;
-  onEditComment: (commentText: string) => void;
+  onEditSuggestion: (commentText: string) => void;
 }
 
 type Suggestion = SuggestAnnotationsWithAIOutput['suggestions'][0] & { id: number };
 
-export default function AiSuggestionSection({ video, selectedVersion, onSuggestionClick, onAddComment, onEditComment }: AiSuggestionSectionProps) {
+export default function AiSuggestionSection({ video, selectedVersion, onSuggestionClick, onAddComment, onEditSuggestion }: AiSuggestionSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const { toast } = useToast();
@@ -69,7 +69,7 @@ export default function AiSuggestionSection({ video, selectedVersion, onSuggesti
   };
 
   const handleEdit = (suggestion: Suggestion) => {
-    onEditComment(suggestion.content);
+    onEditSuggestion(suggestion.content);
     setSuggestions(current => current?.filter(s => s.id !== suggestion.id) || null);
   };
   
