@@ -12,10 +12,10 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestAnnotationsWithAIInputSchema = z.object({
-  videoDataUri: z
+  videoUrl: z
     .string()
     .describe(
-      'The video data as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'
+      'The video data as a public URL or a data URI.'
     ),
 });
 export type SuggestAnnotationsWithAIInput = z.infer<typeof SuggestAnnotationsWithAIInputSchema>;
@@ -23,8 +23,8 @@ export type SuggestAnnotationsWithAIInput = z.infer<typeof SuggestAnnotationsWit
 const SuggestAnnotationsWithAIOutputSchema = z.object({
   suggestions: z.array(
     z.object({
-      timecode: z.string().describe('The timecode of the suggested annotation (e.g., 00:01:23).'),
-      content: z.string().describe('The suggested annotation text.'),
+      timecode: z.string().describe('The timecode of the suggested annotation in HH:MM:SS format.'),
+      content: z.string().describe('The suggested annotation text, providing constructive feedback for video improvement.'),
     })
   ).describe('A list of suggested annotations.'),
 });
@@ -38,13 +38,14 @@ const suggestAnnotationsPrompt = ai.definePrompt({
   name: 'suggestAnnotationsPrompt',
   input: {schema: SuggestAnnotationsWithAIInputSchema},
   output: {schema: SuggestAnnotationsWithAIOutputSchema},
-  prompt: `You are an AI assistant that analyzes video content and provides annotation suggestions. 
+  prompt: `You are an expert video editor providing feedback on a video. Analyze the provided video and suggest specific, actionable improvements with timestamps.
 
-  Analyze the video provided and suggest potential annotations, including the timecode and annotation text.
+  For each suggestion, provide the timecode in HH:MM:SS format and a clear, concise comment on what could be improved.
+  Focus on aspects like pacing, editing, shot composition, color grading, and audio.
 
-  Here is the video to analyze: {{media url=videoDataUri}}
+  Here is the video to analyze: {{media url=videoUrl}}
   
-  Return the suggestions in the format specified by the SuggestAnnotationsWithAIOutputSchema.`,  
+  Return the suggestions in the format specified by the SuggestAnnotationsWithAIOutputSchema. If no suggestions can be made, return an empty array.`,  
 });
 
 const suggestAnnotationsWithAIFlow = ai.defineFlow(

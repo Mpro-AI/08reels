@@ -14,6 +14,7 @@ export default function VideoPlayer({ src, videoRef }: VideoPlayerProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const wasPlayingBeforeSeek = useRef(false);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -33,12 +34,26 @@ export default function VideoPlayer({ src, videoRef }: VideoPlayerProps) {
       setIsMuted(videoRef.current.muted);
     }
   };
+  
+  const handlePointerDown = () => {
+    if (videoRef.current) {
+      wasPlayingBeforeSeek.current = !videoRef.current.paused;
+      if (wasPlayingBeforeSeek.current) {
+        videoRef.current.pause();
+      }
+    }
+  };
+  
+  const handlePointerUp = () => {
+    if (videoRef.current && wasPlayingBeforeSeek.current) {
+      videoRef.current.play();
+    }
+  };
 
   const handleProgressChange = (value: number[]) => {
     if (videoRef.current) {
       const newTime = (value[0] / 100) * duration;
       videoRef.current.currentTime = newTime;
-      setProgress(value[0]);
     }
   };
   
@@ -53,7 +68,7 @@ export default function VideoPlayer({ src, videoRef }: VideoPlayerProps) {
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      setProgress((video.currentTime / video.duration) * 100);
+      setProgress((video.currentTime / video.duration) * 100 || 0);
     };
     const handleDurationChange = () => setDuration(video.duration);
     const handlePlay = () => setIsPlaying(true);
@@ -79,6 +94,8 @@ export default function VideoPlayer({ src, videoRef }: VideoPlayerProps) {
         <Slider
           value={[progress]}
           onValueChange={handleProgressChange}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
           max={100}
           step={0.1}
           className="w-full h-2 cursor-pointer"

@@ -36,7 +36,8 @@ export default function AiSuggestionSection({ video, selectedVersion, onSuggesti
     setIsLoading(true);
     setSuggestions(null);
     try {
-      const result = await suggestAnnotationsWithAI({ videoDataUri: selectedVersion.videoUrl });
+      // The flow is updated to handle URLs directly.
+      const result = await suggestAnnotationsWithAI({ videoUrl: selectedVersion.videoUrl });
       setSuggestions(result.suggestions.map((s, i) => ({...s, id: i})));
     } catch (error) {
       console.error('AI suggestion error:', error);

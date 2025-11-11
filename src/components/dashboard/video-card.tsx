@@ -15,7 +15,7 @@ const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'sec
 };
 
 export default function VideoCard({ video }: { video: Video }) {
-  const latestVersion = video.versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+  const latestVersion = [...video.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0];
   const statusInfo = statusMap[latestVersion.status];
 
   return (

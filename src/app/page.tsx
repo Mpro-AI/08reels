@@ -1,25 +1,12 @@
 'use client';
-import AppLayout from '@/components/app-layout';
+import { useContext } from 'react';
+import AppLayout, { AppLayoutContext } from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoGrid from '@/components/dashboard/video-grid';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCollection } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
-import { useMemo } from 'react';
-import type { Video } from '@/lib/types';
-import { useAuth } from '@/hooks/use-auth';
 
 export default function DashboardPage() {
-  const firestore = useFirestore();
-  const { isAuthenticated } = useAuth();
-  
-  const videosQuery = useMemo(() => {
-    if (!firestore || !isAuthenticated) return null;
-    return collection(firestore, 'videos');
-  }, [firestore, isAuthenticated]);
-
-  const { data: videos, loading } = useCollection<Video>(videosQuery);
+  const { videos, loading } = useContext(AppLayoutContext);
 
   return (
     <AppLayout>
