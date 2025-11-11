@@ -35,6 +35,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: videos, loading: videosLoading } = useCollection<Video>(videosQuery);
 
+  const sortedVideos = useMemo(() => {
+    if (!videos) return [];
+    return [...videos].sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  }, [videos]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -52,11 +56,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  const sortedVideos = useMemo(() => {
-    if (!videos) return [];
-    return [...videos].sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
-  }, [videos]);
   
   return (
     <AppLayoutContext.Provider value={{ videos: sortedVideos, loading: videosLoading }}>
