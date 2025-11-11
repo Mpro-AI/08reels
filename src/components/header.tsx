@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { UploadVideoDialog } from '@/components/video/upload-video-dialog';
-import { DialogTrigger } from '@/components/ui/dialog';
 
 interface HeaderProps {
   title: string;

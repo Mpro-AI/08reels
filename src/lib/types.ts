@@ -27,7 +27,7 @@ export type Annotation = {
 export type VersionStatus = 'pending_review' | 'needs_changes' | 'approved' | 'rejected';
 
 export type Version = {
-  id: string;
+  id:string;
   versionNumber: number;
   status: VersionStatus;
   createdAt: string;

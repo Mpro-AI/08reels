@@ -11,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,7 +74,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
 
         if (video) {
             // Add new version to existing video
-            await addVersionToVideo(firestore, video.id, videoDataUri, user);
+            await addVersionToVideo(firestore, video.id, videoDataUri, { id: user.id, name: user.name });
             toast({ title: '成功', description: '新版本已成功提交。' });
         } else {
             // Create a new video project
@@ -88,9 +87,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             const newVideoData = {
                 title: data.title,
                 videoDataUri: videoDataUri,
-                assignedTo: user, // Or some other logic for assignment
+                assignedTo: { id: user.id, name: user.name }, // Or some other logic for assignment
             };
-            await addVideo(firestore, newVideoData, user);
+            await addVideo(firestore, newVideoData, { id: user.id, name: user.name });
             toast({ title: '成功', description: '新影片專案已成功建立。' });
         }
         handleClose();
@@ -105,9 +104,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+      {children}
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>

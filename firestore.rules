@@ -29,7 +29,7 @@ service cloud.firestore {
     // Rules for the 'videos' collection
     match /videos/{videoId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isCreatingVideo();
       
       // Allow updates (like adding comments, changing status, or adding a version)
       allow update: if isSignedIn() && (
@@ -37,6 +37,28 @@ service cloud.firestore {
         isChangingVersionStatusByAdmin() ||
         isAddingVersion()
       );
+      
+      function isCreatingVideo() {
+        let videoData = request.resource.data;
+        let versions = videoData.versions;
+        
+        // Check required top-level fields
+        if (!('title' in videoData) || !('thumbnailUrl' in videoData) || !('assignedTo' in videoData) || !('uploadedAt' in videoData) || !('versions' in videoData) || !('videoUrl' in videoData)) {
+          return false;
+        }
+
+        // Check that there is exactly one version
+        if (versions.size() != 1) {
+            return false;
+        }
+
+        let firstVersion = versions[0];
+        
+        // Verify the new version uploader is the current user
+        return firstVersion.uploader.id == request.auth.uid &&
+               firstVersion.status == 'pending_review' &&
+               firstVersion.isCurrentActive == true;
+      }
       
       function isAddingComment() {
         let videoBefore = resource.data;
