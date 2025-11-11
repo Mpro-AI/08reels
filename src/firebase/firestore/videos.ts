@@ -13,6 +13,7 @@ import {
 import type { Video, Comment, VersionStatus, User, Version, Annotation } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { generateThumbnail } from '@/ai/flows/generate-thumbnail-flow';
 
 export function setVideo(
   db: Firestore,
@@ -254,10 +255,23 @@ export async function addVideo(
             notes: newVideoData.notes,
         };
 
+        let thumbnailUrl = 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video';
+        try {
+            const result = await generateThumbnail({
+                title: newVideoData.title,
+                notes: newVideoData.notes || '',
+            });
+            if (result) {
+                thumbnailUrl = result;
+            }
+        } catch (e) {
+            console.error('AI thumbnail generation failed, falling back to placeholder.', e);
+        }
+
         const newVideo: Omit<Video, 'id'> = {
             title: newVideoData.title,
-            thumbnailUrl: 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video',
-            thumbnailHint: 'video placeholder',
+            thumbnailUrl,
+            thumbnailHint: `${newVideoData.title} ${newVideoData.notes || ''}`.trim(),
             author: author,
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
