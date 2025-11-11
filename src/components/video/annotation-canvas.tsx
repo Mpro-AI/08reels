@@ -57,8 +57,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       clientX = event.nativeEvent.touches[0].clientX;
       clientY = event.nativeEvent.touches[0].clientY;
     } else {
-      clientX = event.nativeEvent.clientX;
-      clientY = event.nativeEvent.clientY;
+      clientX = (event.nativeEvent as MouseEvent).clientX;
+      clientY = (event.nativeEvent as MouseEvent).clientY;
     }
 
     return {
@@ -329,8 +329,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         updatedData.height += rotatedDy;
 
         if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey) {
-            if (selectedAnnotation.type === 'image') {
-              const originalAspectRatio = selectedAnnotation.data.width / selectedAnnotation.data.height;
+            if (selectedAnnotation.type === 'image' && (selectedAnnotation.data as ImageAnnotationData).width > 0) {
+              const originalAspectRatio = (selectedAnnotation.data as ImageAnnotationData).width / (selectedAnnotation.data as ImageAnnotationData).height;
               updatedData.height = updatedData.width / originalAspectRatio;
             }
         }
@@ -378,7 +378,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     return 'default';
   }
 
-  const pointerEventsEnabled = annotationMode !== 'select' || (annotations && annotations.length > 0);
+  const pointerEventsEnabled = annotationMode !== 'select' || (annotations && annotations.length > 0) || isAnnotating;
 
 
   return (
