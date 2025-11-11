@@ -5,14 +5,13 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
-import { Skeleton } from '@/components/ui/skeleton';
-import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus, User } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { addCommentToVersion, setVersionStatus } from '@/firebase/firestore/videos';
+import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion } from '@/firebase/firestore/videos';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -72,18 +71,19 @@ export default function VideoPage() {
       text: commentText,
     };
     
-    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, { id: user.id, name: user.name });
+    // We pass the full user object now
+    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, user as User);
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
     if (!firestore || !video || !user) return;
     
-    if (video.author.id !== user.id) {
+    if (user.role !== 'admin') {
         toast({
             variant: 'destructive',
             title: '權限不足',
-            description: '只有影片的作者才能變更版本狀態。'
+            description: '只有管理員才能變更版本狀態。'
         });
         return;
     }
@@ -94,6 +94,25 @@ export default function VideoPage() {
       title: '版本狀態已更新',
     });
   }, [firestore, video, user, toast]);
+
+  const handleDeleteComment = useCallback((commentId: string) => {
+    if (!firestore || !video || !user || !selectedVersionId) return;
+    
+    deleteCommentFromVersion(firestore, video.id, selectedVersionId, commentId);
+
+    toast({
+      variant: 'default',
+      title: '評論已刪除',
+    });
+
+  }, [firestore, video, user, selectedVersionId, toast]);
+
+  const handleAnnotation = (type: 'pen' | 'image') => {
+    toast({
+        title: '功能開發中',
+        description: `「${type === 'pen' ? '筆畫註解' : '插入圖片'}」功能即將推出！`
+    })
+  }
 
 
   useEffect(() => {
@@ -138,6 +157,9 @@ export default function VideoPage() {
                         currentTimeFormatted={formatTime(currentTime)}
                         onAddComment={handleAddComment}
                         onVersionStatusChange={handleVersionStatusChange}
+                        onDeleteComment={handleDeleteComment}
+                        onPenAnnotation={() => handleAnnotation('pen')}
+                        onImageAnnotation={() => handleAnnotation('image')}
                     />
                 </div>
             </main>

@@ -1,11 +1,24 @@
 'use client';
-import { MessageSquare, Plus } from 'lucide-react';
+import { MessageSquare, Plus, PenLine, ImagePlus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Comment } from '@/lib/types';
 import { format } from 'date-fns';
 import { useAuth as useAppAuth } from '@/hooks/use-auth';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { cn } from '@/lib/utils';
+
 
 interface CommentSectionProps {
   comments: Comment[];
@@ -14,9 +27,22 @@ interface CommentSectionProps {
   onAddComment: (commentText: string) => void;
   inputValue: string;
   onInputValueChange: (value: string) => void;
+  onDeleteComment: (commentId: string) => void;
+  onPenAnnotation: (commentId: string) => void;
+  onImageAnnotation: (commentId: string) => void;
 }
 
-export default function CommentSection({ comments, onCommentClick, currentTimeFormatted, onAddComment, inputValue, onInputValueChange }: CommentSectionProps) {
+export default function CommentSection({ 
+  comments, 
+  onCommentClick, 
+  currentTimeFormatted, 
+  onAddComment, 
+  inputValue, 
+  onInputValueChange,
+  onDeleteComment,
+  onPenAnnotation,
+  onImageAnnotation,
+}: CommentSectionProps) {
   const { user } = useAppAuth();
 
   const handleAddComment = () => {
@@ -25,6 +51,11 @@ export default function CommentSection({ comments, onCommentClick, currentTimeFo
       onInputValueChange('');
     }
   };
+
+  const canDelete = (comment: Comment) => {
+    if (!user) return false;
+    return user.role === 'admin' || user.id === comment.author.id;
+  }
 
   return (
     <Card className="border-0 shadow-none">
@@ -52,20 +83,56 @@ export default function CommentSection({ comments, onCommentClick, currentTimeFo
             comments
               .sort((a,b) => a.timecode - b.timecode)
               .map(comment => (
-              <div key={comment.id} className="text-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold">{comment.author.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm')}
-                  </span>
-                </div>
+              <div key={comment.id} className="text-sm group/comment relative">
                 <div 
                   className="p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted"
                   onClick={() => onCommentClick(comment.timecode)}
                 >
-                  <p className="text-primary font-mono text-xs mb-1">{comment.timecodeFormatted}</p>
-                  <p className="text-foreground">{comment.text}</p>
+                    <div className="flex items-start justify-between mb-2">
+                        <div>
+                            <p className="font-semibold">{comment.author.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm')}
+                            </p>
+                        </div>
+                        <p className="text-primary font-mono text-xs">{comment.timecodeFormatted}</p>
+                    </div>
+                  <p className="text-foreground whitespace-pre-wrap">{comment.text}</p>
                 </div>
+                {user?.role === 'admin' && (
+                    <div className={cn(
+                        "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
+                        "opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                    )}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onPenAnnotation(comment.id)}>
+                            <PenLine className="h-3.5 w-3.5"/>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onImageAnnotation(comment.id)}>
+                            <ImagePlus className="h-3.5 w-3.5"/>
+                        </Button>
+                        {canDelete(comment) && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive">
+                                        <Trash2 className="h-3.5 w-3.5"/>
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            這個操作無法復原。這將會永久刪除此評論。
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>取消</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onDeleteComment(comment.id)}>確定刪除</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
+                    </div>
+                )}
               </div>
             ))
           ) : (

@@ -15,9 +15,23 @@ interface SidePanelProps {
   currentTimeFormatted: string;
   onAddComment: (commentText: string, timecode?: number) => void;
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
+  onDeleteComment: (commentId: string) => void;
+  onPenAnnotation: (commentId: string) => void;
+  onImageAnnotation: (commentId: string) => void;
 }
 
-export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment, onVersionStatusChange }: SidePanelProps) {
+export default function SidePanel({ 
+    video, 
+    selectedVersion, 
+    onVersionChange, 
+    onTimecodeClick, 
+    currentTimeFormatted, 
+    onAddComment, 
+    onVersionStatusChange,
+    onDeleteComment,
+    onPenAnnotation,
+    onImageAnnotation,
+}: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
 
   const handleSuggestionToComment = (content: string) => {
@@ -50,6 +64,9 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
                     onAddComment={onAddComment}
                     inputValue={commentInput}
                     onInputValueChange={setCommentInput}
+                    onDeleteComment={onDeleteComment}
+                    onPenAnnotation={onPenAnnotation}
+                    onImageAnnotation={onImageAnnotation}
                 />
             </TabsContent>
             <TabsContent value="versions" className="m-0">

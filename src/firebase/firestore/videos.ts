@@ -35,7 +35,7 @@ export function addCommentToVersion(
   videoId: string,
   versionId: string,
   commentData: Omit<Comment, 'id' | 'createdAt' | 'author'>,
-  author: Pick<User, 'id' | 'name'>,
+  author: User, // Changed to full User object
 ) {
   const videoRef = doc(db, 'videos', videoId);
   runTransaction(db, async (transaction) => {
@@ -52,7 +52,7 @@ export function addCommentToVersion(
 
     const newComment: Comment = {
       ...commentData,
-      author,
+      author, // Pass the full author object
       id: doc(collection(db, 'dummy')).id, 
       createdAt: Timestamp.now().toDate().toISOString(),
     };
@@ -67,6 +67,41 @@ export function addCommentToVersion(
       path: videoRef.path,
       operation: 'update',
       requestResourceData: { comment: commentData },
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  });
+}
+
+export function deleteCommentFromVersion(
+  db: Firestore,
+  videoId: string,
+  versionId: string,
+  commentId: string
+) {
+  const videoRef = doc(db, "videos", videoId);
+  runTransaction(db, async (transaction) => {
+    const videoDoc = await transaction.get(videoRef);
+    if (!videoDoc.exists()) {
+      throw "Video does not exist!";
+    }
+
+    const video = videoDoc.data() as Video;
+    const versionIndex = video.versions.findIndex((v) => v.id === versionId);
+    if (versionIndex === -1) {
+      throw "Version does not exist!";
+    }
+
+    const newVersions = [...video.versions];
+    const currentComments = newVersions[versionIndex].comments;
+    newVersions[versionIndex].comments = currentComments.filter(c => c.id !== commentId);
+
+    transaction.update(videoRef, { versions: newVersions });
+  }).catch((e) => {
+    console.error("Transaction failed: ", e);
+    const permissionError = new FirestorePermissionError({
+        path: videoRef.path,
+        operation: 'update',
+        requestResourceData: { deleteCommentId: commentId },
     });
     errorEmitter.emit('permission-error', permissionError);
   });
