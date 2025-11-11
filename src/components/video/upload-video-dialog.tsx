@@ -33,7 +33,6 @@ const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"]
 
 const formSchema = z.object({
   title: z.string().optional(),
-  assignedTo: z.string().optional(),
   notes: z.string().optional(),
   videoFile: z.instanceof(FileList)
     .refine(files => files?.length > 0, '請選擇一個影片檔案')
@@ -71,7 +70,6 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
     })),
     defaultValues: {
       title: '',
-      assignedTo: '',
       notes: '',
       videoFile: undefined
     }
@@ -80,7 +78,6 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   useEffect(() => {
     if(isOpen) {
       form.reset();
-      form.setValue('assignedTo', user?.id || '');
       setIsSubmitting(false);
       setUploadProgress(0);
     }
@@ -92,7 +89,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   };
 
   const onSubmit = async (data: UploadVideoForm) => {
-    if (!user || !firestore || !storage || !users) {
+    if (!user || !firestore || !storage) {
       toast({ variant: 'destructive', title: '錯誤', description: '使用者未登入或服務連線失敗' });
       return;
     }
@@ -113,15 +110,8 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             await addVersionToVideo(firestore, video.id, downloadURL, { id: user.id, name: user.name }, data.notes);
             toast({ title: '成功', description: '新版本已成功提交。' });
         } else {
-            if (!data.title || !data.assignedTo) {
-                toast({ variant: 'destructive', title: '錯誤', description: '請提供影片標題並指派一位使用者。' });
-                setIsSubmitting(false);
-                return;
-            }
-            
-            const assignedUser = users.find(u => u.id === data.assignedTo);
-            if (!assignedUser) {
-                toast({ variant: 'destructive', title: '錯誤', description: '找不到被指派的使用者。' });
+            if (!data.title) {
+                toast({ variant: 'destructive', title: '錯誤', description: '請提供影片標題。' });
                 setIsSubmitting(false);
                 return;
             }
@@ -129,7 +119,6 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             const newVideoData = {
                 title: data.title,
                 videoUrl: downloadURL,
-                assignedTo: { id: assignedUser.id, name: assignedUser.name },
                 notes: data.notes,
             };
             await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
@@ -177,27 +166,6 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="assignedTo"
-                    render={({ field }) => (
-                      <FormItem className="grid grid-cols-4 items-center gap-4">
-                        <FormLabel className="text-right">指派給</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={isSubmitting || usersLoading}>
-                          <FormControl className="col-span-3">
-                            <SelectTrigger>
-                              <SelectValue placeholder={usersLoading ? "載入中..." : "選擇一位使用者"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {users?.map(u => (
-                              <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
                 </>
               )}
               <FormField
@@ -230,9 +198,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                   </FormItem>
                 )}
               />
-               {(form.formState.errors.title || form.formState.errors.videoFile || form.formState.errors.assignedTo) && (
+               {(form.formState.errors.title || form.formState.errors.videoFile) && (
                   <div className="col-span-4">
-                    <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString() || form.formState.errors.assignedTo?.message}</FormMessage>
+                    <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>
                   </div>
               )}
               {isSubmitting && (

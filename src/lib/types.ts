@@ -1,5 +1,3 @@
-export type UserRole = 'admin' | 'employee';
-
 export type User = {
   id: string; // Firebase Auth UID
   name: string;
@@ -45,7 +43,6 @@ export type Video = {
   thumbnailUrl: string;
   thumbnailHint: string;
   author: Pick<User, 'id' | 'name'>;
-  assignedTo: Pick<User, 'id' | 'name'>;
   uploadedAt: string;
   versions: Version[];
   videoUrl: string; // The URL of the currently active video version for quick access

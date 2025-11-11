@@ -19,7 +19,7 @@ service cloud.firestore {
 
     // Videos can be listed and read by any signed-in user.
     // Creation is allowed if the author is the current user.
-    // Updates are allowed by the video's author or the person it's assigned to, with restrictions.
+    // Updates are allowed only by the video's author.
     match /videos/{videoId} {
       allow get, list: if isSignedIn();
       
@@ -28,23 +28,7 @@ service cloud.firestore {
                     && request.resource.data.title is string
                     && request.resource.data.thumbnailUrl is string;
 
-      allow update: if isSignedIn()
-                    && (
-                      // Case 1: The user is the author.
-                      // The author can change anything except who the author is.
-                      (request.auth.uid == resource.data.author.id && request.resource.data.author.id == resource.data.author.id)
-                      ||
-                      // Case 2: The user is the assigned-to user (but not the author).
-                      // They can only update the versions and uploadedAt fields.
-                      // We verify this by ensuring all other core fields have NOT changed.
-                      (request.auth.uid == resource.data.assignedTo.id
-                        && request.resource.data.title == resource.data.title
-                        && request.resource.data.author.id == resource.data.author.id
-                        && request.resource.data.assignedTo.id == resource.data.assignedTo.id
-                        && request.resource.data.thumbnailUrl == resource.data.thumbnailUrl
-                        && request.resource.data.thumbnailHint == resource.data.thumbnailHint
-                      )
-                    );
+      allow update: if isSignedIn() && request.auth.uid == resource.data.author.id;
       
       allow delete: if isSignedIn() && request.auth.uid == resource.data.author.id;
     }

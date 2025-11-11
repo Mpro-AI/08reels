@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Video, VersionStatus } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { Clock, User, GitBranch, UserCheck } from 'lucide-react';
+import { Clock, User, GitBranch } from 'lucide-react';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   approved: { text: '已核可', variant: 'default' },
@@ -46,10 +46,6 @@ export default function VideoCard({ video }: { video: Video }) {
          <div className="flex items-center gap-2">
             <User className="size-4"/>
             <span>作者：{video.author.name}</span>
-         </div>
-         <div className="flex items-center gap-2">
-            <UserCheck className="size-4"/>
-            <span>指派給：{video.assignedTo.name}</span>
          </div>
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground">

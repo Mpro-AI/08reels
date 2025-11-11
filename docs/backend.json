@@ -133,7 +133,7 @@
         "thumbnailHint": {
           "type": "string"
         },
-        "assignedTo": {
+        "author": {
           "$ref": "#/backend/entities/UserReference"
         },
         "uploadedAt": {
@@ -150,7 +150,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "title", "thumbnailUrl", "assignedTo", "uploadedAt", "versions", "videoUrl"]
+      "required": ["id", "title", "thumbnailUrl", "author", "uploadedAt", "versions", "videoUrl"]
     },
     "UserReference": {
       "title": "User Reference",
