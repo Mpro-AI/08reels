@@ -32,7 +32,8 @@ service cloud.firestore {
     
     // Rules for the 'videos' collection
     match /videos/{videoId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if isSignedIn() && isCreatingVideo();
       
       // Allow updates (like adding comments, changing status, or adding a version)
