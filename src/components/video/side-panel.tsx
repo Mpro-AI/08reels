@@ -1,10 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, GitBranch, Wand2 } from 'lucide-react';
+import { MessageSquare, GitBranch } from 'lucide-react';
 import CommentSection from './comment-section';
 import VersionSection from './version-section';
-import AiSuggestionSection from './ai-suggestion-section';
 import { Video, Version, VersionStatus } from '@/lib/types';
 
 interface SidePanelProps {
@@ -32,14 +31,10 @@ export default function SidePanel({
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
 
-  const handleSuggestionToComment = (content: string) => {
-    setCommentInput(content);
-  };
-
   return (
     <div className="h-full bg-card border-l flex flex-col">
       <Tabs defaultValue="comments" className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-3 m-2">
+        <TabsList className="grid w-full grid-cols-2 m-2">
           <TabsTrigger value="comments">
             <MessageSquare className="mr-1.5 h-4 w-4" />
             評論
@@ -47,10 +42,6 @@ export default function SidePanel({
           <TabsTrigger value="versions">
             <GitBranch className="mr-1.5 h-4 w-4" />
             版本
-          </TabsTrigger>
-          <TabsTrigger value="ai">
-            <Wand2 className="mr-1.5 h-4 w-4" />
-            AI 建議
           </TabsTrigger>
         </TabsList>
         <div className="flex-1 overflow-y-auto">
@@ -74,15 +65,6 @@ export default function SidePanel({
                   onVersionChange={onVersionChange}
                   onStatusChange={onVersionStatusChange}
                 />
-            </TabsContent>
-            <TabsContent value="ai" className="m-0">
-              <AiSuggestionSection 
-                video={video}
-                selectedVersion={selectedVersion}
-                onSuggestionClick={onTimecodeClick}
-                onAddComment={onAddComment}
-                onEditSuggestion={handleSuggestionToComment}
-              />
             </TabsContent>
         </div>
       </Tabs>

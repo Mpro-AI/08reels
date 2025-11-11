@@ -1,5 +1,2 @@
 'use server';
-import { config } from 'dotenv';
-config();
-
-import '@/ai/flows/suggest-annotations-with-ai.ts';
+// This file is intentionally left blank after removing AI features.
