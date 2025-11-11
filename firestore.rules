@@ -1,124 +1,33 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // =================================
-    // Helper Functions
-    // =================================
 
+    // ========== Helpers ==========
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
-    
-    // Checks if the user is the author of the video.
-    function isAuthor(videoData) {
-        return request.auth.uid == videoData.author.id;
-    }
-    
-    // Checks if the user is assigned to the video.
-    function isAssignedTo(videoData) {
-        return request.auth.uid == videoData.assignedTo.id;
-    }
+    // ========== Collections ==========
 
-    // A user has owner-like permissions if they are the author or an admin.
-    function isOwner(videoData) {
-      return isAuthor(videoData) || isAdmin();
-    }
-
-    // =================================
-    // Data Validation Functions
-    // =================================
-    
-    // Validates a UserReference object { id, name }
-    function isValidUserReference(userRef) {
-        return userRef.keys().hasAll(['id', 'name']) &&
-               userRef.id is string && userRef.id != '' &&
-               userRef.name is string && userRef.name != '';
-    }
-
-    // Validates a single Comment object
-    function isValidComment(comment) {
-      return comment.keys().hasAll(['id', 'timecode', 'timecodeFormatted', 'text', 'author', 'createdAt']) &&
-             comment.id is string &&
-             comment.timecode is number &&
-             comment.timecodeFormatted is string &&
-             comment.text is string &&
-             isValidUserReference(comment.author) &&
-             comment.createdAt is string;
-    }
-    
-    // Validates a single Version object
-    function isValidVersion(version) {
-        // The 'notes' field is optional, so we don't validate its presence.
-        return version.keys().hasAll(['id', 'versionNumber', 'status', 'createdAt', 'uploader', 'comments', 'annotations', 'isCurrentActive', 'videoUrl']) &&
-               version.id is string &&
-               version.versionNumber is number &&
-               ['pending_review', 'needs_changes', 'approved', 'rejected'].hasAny([version.status]) &&
-               version.createdAt is string &&
-               isValidUserReference(version.uploader) &&
-               version.videoUrl is string &&
-               // All items in the comments list must be valid comments
-               (version.comments is list && (version.comments.size() == 0 || version.comments.all(c, isValidComment(c))));
-    }
-    
-    // Validates the entire Video document data for consistency and correctness.
-    function isValidVideoData(videoData) {
-        return videoData.keys().hasAll(['title', 'thumbnailUrl', 'thumbnailHint', 'author', 'assignedTo', 'uploadedAt', 'versions', 'videoUrl']) &&
-               videoData.title is string && videoData.title != '' &&
-               videoData.thumbnailUrl is string &&
-               isValidUserReference(videoData.author) &&
-               isValidUserReference(videoData.assignedTo) &&
-               videoData.uploadedAt is string &&
-               videoData.videoUrl is string &&
-               videoData.versions is list && videoData.versions.size() > 0 &&
-               // All items in the versions list must be valid versions
-               videoData.versions.all(v, isValidVersion(v));
-    }
-
-    // =================================
-    // Collection Rules
-    // =================================
-
+    // Users can read other user profiles (for assign-to dropdown)
+    // and can only write to their own user profile document.
     match /users/{userId} {
       allow read: if isSignedIn();
-      // Allow a user to create and update their own user document.
-      allow write: if request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
-    
+
+    // Videos can be listed and read by any signed-in user.
+    // Creation is allowed if the author is the current user.
+    // Updates are allowed by the video's author or the person it's assigned to.
     match /videos/{videoId} {
-      // Any signed-in user can view a single video or list all videos.
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-
-      // Rules for creating a new video document
-      allow create: if isSignedIn() &&
-                       // The creator must be the author.
-                       isAuthor(request.resource.data) &&
-                       // The initial version list must have exactly one version.
-                       request.resource.data.versions.size() == 1 &&
-                       // That first version must be version number 1.
-                       request.resource.data.versions[0].versionNumber == 1 &&
-                       // The uploader of the first version must be the author.
-                       request.resource.data.versions[0].uploader.id == request.auth.uid &&
-                       // The entire document data must be valid.
-                       isValidVideoData(request.resource.data);
-
-      // Rules for updating an existing video document
-      allow update: if isSignedIn() &&
-                       // The author of the video cannot be changed.
-                       resource.data.author.id == request.resource.data.author.id &&
-                       // The entire updated document data must be valid.
-                       isValidVideoData(request.resource.data) &&
-                       // The person making the change must be the owner (author/admin) or the person it's assigned to.
-                       (isOwner(resource.data) || isAssignedTo(resource.data));
-
-      // Deletion is not allowed through client-side rules for data integrity.
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.author.id == request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.thumbnailUrl is string;
+      allow update: if isSignedIn()
+                    && (request.auth.uid == resource.data.author.id || request.auth.uid == resource.data.assignedTo.id);
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.author.id;
     }
   }
 }
