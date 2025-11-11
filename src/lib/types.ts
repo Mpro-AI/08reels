@@ -11,7 +11,7 @@ export type Comment = {
   timecode: number;
   timecodeFormatted: string;
   text: string;
-  author: User;
+  author: User; // Changed from Pick<User, 'id' | 'name'>
   createdAt: string;
 };
 

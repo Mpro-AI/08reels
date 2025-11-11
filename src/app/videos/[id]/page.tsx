@@ -3,7 +3,7 @@ import { useParams } from 'next/navigation';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
-import VideoPlayer from '@/components/video/video-player';
+import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
 import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -77,7 +77,6 @@ export default function VideoPage() {
       text: commentText,
     };
     
-    // We pass the full user object now
     addCommentToVersion(firestore, video.id, selectedVersionId, newComment, user as User);
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
@@ -178,6 +177,7 @@ export default function VideoPage() {
   }
 
   const allAnnotations = [...(selectedVersion.annotations || []), ...newAnnotations];
+  const visibleAnnotations = allAnnotations.filter(a => currentTime >= a.timecode && currentTime < a.timecode + 3);
 
   return (
     <AppLayout>
@@ -199,7 +199,7 @@ export default function VideoPage() {
                     <AnnotationCanvas 
                       width={playerRef.current?.clientWidth || 0}
                       height={playerRef.current?.clientHeight || 0}
-                      annotations={allAnnotations.filter(a => a.timecode === Math.floor(currentTime))}
+                      annotations={visibleAnnotations}
                       onAddAnnotation={handleAddAnnotation}
                       isDrawing={isDrawing}
                     />
