@@ -175,7 +175,7 @@ export async function addVideo(
     const videoRef = doc(db, 'videos', videoId);
     try {
         const firstVersion: Version = {
-            id: doc(collection(db, 'videos')).id,
+            id: doc(collection(db, 'dummy')).id, // Generate a unique ID for the version
             versionNumber: 1,
             status: 'pending_review',
             createdAt: Timestamp.now().toDate().toISOString(),
