@@ -71,6 +71,25 @@ export default function VideoPage() {
     }
   }, [video, selectedVersionId]);
 
+  const enterAnnotationMode = (mode: AnnotationMode) => {
+    if (playerRef.current) {
+      playerRef.current.pause();
+    }
+    setIsAnnotating(true);
+    setAnnotationMode(mode);
+
+    if (mode === 'image') {
+      imageAnnotationInputRef.current?.click();
+    }
+  };
+
+  const handleAnnotationClick = useCallback((timecode: number, mode: AnnotationMode) => {
+    if (playerRef.current) {
+      playerRef.current.currentTime = timecode;
+    }
+    enterAnnotationMode(mode);
+  }, []);
+
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (playerRef.current) {
       playerRef.current.currentTime = timecode;
@@ -111,25 +130,6 @@ export default function VideoPage() {
 
   }, [firestore, video, user, selectedVersionId, toast]);
 
-  const enterAnnotationMode = (mode: AnnotationMode) => {
-    if (playerRef.current) {
-      playerRef.current.pause();
-    }
-    setIsAnnotating(true);
-    setAnnotationMode(mode);
-
-    if (mode === 'image') {
-      imageAnnotationInputRef.current?.click();
-    }
-  };
-
-  const handleAnnotationClick = useCallback((timecode: number, mode: AnnotationMode) => {
-    if (playerRef.current) {
-      playerRef.current.currentTime = timecode;
-    }
-    enterAnnotationMode(mode);
-  }, []);
-
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storage || !user || !selectedVersionId || !video) {
@@ -138,6 +138,7 @@ export default function VideoPage() {
     }
 
     setIsUploading(true);
+    setAnnotationMode('select'); // Set mode to select to allow interaction with the new image
 
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
@@ -180,8 +181,6 @@ export default function VideoPage() {
         if (imageAnnotationInputRef.current) {
           imageAnnotationInputRef.current.value = '';
         }
-        // Set mode to select to allow interaction with the new image
-        setAnnotationMode('select');
     }
   };
 
@@ -396,8 +395,8 @@ export default function VideoPage() {
                         selectedVersion={selectedVersion}
                         onVersionChange={setSelectedVersionId}
                         onTimecodeClick={handleTimecodeClick} 
-                        currentTimeFormatted={formatTime(currentTime)}
                         onAnnotationClick={handleAnnotationClick}
+                        currentTimeFormatted={formatTime(currentTime)}
                     />
                 </div>
             </main>
