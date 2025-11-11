@@ -53,3 +53,47 @@ export async function uploadVideoAndGetUrl(
     );
   });
 }
+
+
+/**
+ * Uploads an image for an annotation to Firebase Storage.
+ * @param storage The Firebase Storage instance.
+ * @param file The image file to upload.
+ * @param videoId The ID of the video project.
+ * @param versionId The ID of the version.
+ * @returns A promise that resolves with the public download URL of the image.
+ */
+export async function uploadAnnotationImage(
+  storage: FirebaseStorage,
+  file: File,
+  videoId: string,
+  versionId: string,
+): Promise<string> {
+  const annotationImageId = uuidv4();
+  const storagePath = `videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${file.name}`;
+  const storageRef = ref(storage, storagePath);
+
+  const uploadTask = uploadBytesResumable(storageRef, file);
+
+  return new Promise((resolve, reject) => {
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => {
+        // Optional: handle progress if needed in the UI
+      },
+      (error) => {
+        console.error('Annotation image upload failed:', error);
+        reject(error);
+      },
+      async () => {
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        } catch (error) {
+          console.error('Failed to get annotation image download URL:', error);
+          reject(error);
+        }
+      }
+    );
+  });
+}

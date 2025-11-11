@@ -30,7 +30,7 @@ export function setVideo(
   });
 }
 
-export function addAnnotationToVersion(
+export function addAnnotationsToVersion(
   db: Firestore,
   videoId: string,
   versionId: string,
@@ -52,7 +52,7 @@ export function addAnnotationToVersion(
         const newAnnotationsWithIds: Annotation[] = annotations.map(anno => ({
             ...anno,
             id: doc(collection(db, 'dummy')).id,
-        }));
+        } as Annotation));
 
         const newVersions = [...video.versions];
         if (!newVersions[versionIndex].annotations) {

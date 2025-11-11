@@ -11,7 +11,7 @@ export type Comment = {
   timecode: number;
   timecodeFormatted: string;
   text: string;
-  author: User; // Changed from Pick<User, 'id' | 'name'>
+  author: User;
   createdAt: string;
 };
 
@@ -21,10 +21,18 @@ export type PenAnnotationData = {
   lineWidth: number;
 };
 
+export type ImageAnnotationData = {
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type Annotation = {
     id: string;
     type: 'pen' | 'text' | 'image';
-    data: PenAnnotationData | any; // Could be path for pen, text content, image url etc.
+    data: PenAnnotationData | ImageAnnotationData | any;
     author: Pick<User, 'id' | 'name'>;
     createdAt: string;
     timecode: number;

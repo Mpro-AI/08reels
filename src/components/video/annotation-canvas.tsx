@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Annotation, PenAnnotationData } from '@/lib/types';
+import { Annotation, PenAnnotationData, ImageAnnotationData } from '@/lib/types';
 
 interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData) => void;
-  isDrawing: boolean;
+  onAddAnnotation: (data: PenAnnotationData | {x: number, y: number}) => void;
+  annotationMode: 'pen' | 'image' | null;
 }
 
 const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
@@ -16,11 +16,12 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   height,
   annotations,
   onAddAnnotation,
-  isDrawing,
+  annotationMode,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<{ x: number; y: number }[]>([]);
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const getCanvasContext = () => {
     const canvas = canvasRef.current;
@@ -41,25 +42,49 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     ctx.stroke();
   };
 
+  const drawImage = (ctx: CanvasRenderingContext2D, data: ImageAnnotationData) => {
+    const cachedImage = imageCache.current.get(data.url);
+    if (cachedImage) {
+      ctx.drawImage(cachedImage, data.x, data.y, data.width, data.height);
+    } else {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = data.url;
+      img.onload = () => {
+        imageCache.current.set(data.url, img);
+        // Request a re-render by calling a dummy state update or via a parent prop
+        // For simplicity, we'll rely on the parent component's re-renders for now.
+        // A more robust solution might involve a state update here.
+        if (canvasRef.current) {
+           const currentCtx = getCanvasContext();
+           if(currentCtx) {
+             redrawCanvas(currentCtx);
+           }
+        }
+      };
+    }
+  }
+
+  const redrawCanvas = (ctx: CanvasRenderingContext2D) => {
+     if (!canvasRef.current) return;
+     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      annotations.forEach((annotation) => {
+        if (annotation.type === 'pen') {
+          drawPath(ctx, annotation.data.path, annotation.data.color, annotation.data.lineWidth);
+        } else if (annotation.type === 'image') {
+          drawImage(ctx, annotation.data as ImageAnnotationData);
+        }
+      });
+      if (annotationMode === 'pen' && currentPath.length > 1) {
+        drawPath(ctx, currentPath, '#FF0000', 3);
+      }
+  }
+
   useEffect(() => {
     const ctx = getCanvasContext();
     if (!ctx || !canvasRef.current) return;
-
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-    annotations.forEach((annotation) => {
-      if (annotation.type === 'pen') {
-        const data = annotation.data as PenAnnotationData;
-        drawPath(ctx, data.path, data.color, data.lineWidth);
-      }
-    });
-
-    // Draw the current path being drawn
-    if (currentPath.length > 1) {
-        drawPath(ctx, currentPath, '#FF0000', 3);
-    }
-
-  }, [annotations, currentPath, width, height]);
+    redrawCanvas(ctx);
+  }, [annotations, currentPath, width, height, annotationMode]);
 
   const getCoordinates = (event: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -68,53 +93,62 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-
+    
+    let clientX, clientY;
     if ('touches' in event.nativeEvent) {
-      return {
-        x: (event.nativeEvent.touches[0].clientX - rect.left) * scaleX,
-        y: (event.nativeEvent.touches[0].clientY - rect.top) * scaleY,
-      };
+      clientX = event.nativeEvent.touches[0].clientX;
+      clientY = event.nativeEvent.touches[0].clientY;
+    } else {
+      clientX = event.nativeEvent.clientX;
+      clientY = event.nativeEvent.clientY;
     }
+
     return {
-      x: (event.nativeEvent.offsetX) * scaleX,
-      y: (event.nativeEvent.offsetY) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   };
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
     const coords = getCoordinates(e);
     if (!coords) return;
-    setDrawing(true);
-    setCurrentPath([coords]);
+
+    if (annotationMode === 'pen') {
+      setDrawing(true);
+      setCurrentPath([coords]);
+    } else if (annotationMode === 'image') {
+       onAddAnnotation({ x: coords.x, y: coords.y });
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !drawing) return;
+    if (annotationMode !== 'pen' || !drawing) return;
     const coords = getCoordinates(e);
     if (!coords) return;
     setCurrentPath((prev) => [...prev, coords]);
   };
 
   const handleMouseUp = () => {
-    if (!isDrawing || !drawing) return;
+    if (annotationMode !== 'pen' || !drawing) return;
     setDrawing(false);
     if (currentPath.length > 1) {
       const annotationData: PenAnnotationData = {
         path: currentPath,
-        color: '#FF0000', // Hardcoded for now
-        lineWidth: 3,    // Hardcoded for now
+        color: '#FF0000',
+        lineWidth: 3,
       };
       onAddAnnotation(annotationData);
     }
     setCurrentPath([]);
   };
-
-  if (!isDrawing && annotations.length === 0) {
+  
+  if (annotationMode === null && annotations.length === 0) {
     return null;
   }
   
-  const pointerEventsClass = isDrawing ? 'auto' : 'none';
+  const pointerEventsClass = annotationMode !== null ? 'auto' : 'none';
+  const cursorClass = annotationMode === 'image' ? 'crosshair' : (annotationMode === 'pen' ? 'auto' : 'default');
+
 
   return (
     <canvas
@@ -129,7 +163,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       onTouchMove={handleMouseMove}
       onTouchEnd={handleMouseUp}
       className="absolute top-0 left-0"
-      style={{ pointerEvents: pointerEventsClass }}
+      style={{ pointerEvents: pointerEventsClass, cursor: cursorClass }}
     />
   );
 };

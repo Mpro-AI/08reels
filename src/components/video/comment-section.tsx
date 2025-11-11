@@ -1,5 +1,5 @@
 'use client';
-import { MessageSquare, Plus, PenLine, Trash2 } from 'lucide-react';
+import { MessageSquare, Plus, PenLine, Trash2, ImageUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +28,7 @@ interface CommentSectionProps {
   inputValue: string;
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
-  onPenAnnotation: () => void;
+  onEnterAnnotationMode: (mode: 'pen' | 'image') => void;
 }
 
 export default function CommentSection({ 
@@ -39,7 +39,7 @@ export default function CommentSection({
   inputValue, 
   onInputValueChange,
   onDeleteComment,
-  onPenAnnotation,
+  onEnterAnnotationMode,
 }: CommentSectionProps) {
   const { user } = useAppAuth();
 
@@ -76,9 +76,13 @@ export default function CommentSection({
                 <Plus className="mr-2 h-4 w-4" />
                 新增評論
             </Button>
-            <Button variant="outline" onClick={onPenAnnotation}>
+            <Button variant="outline" onClick={() => onEnterAnnotationMode('pen')}>
                 <PenLine className="mr-2 h-4 w-4"/>
-                註解
+                筆畫
+            </Button>
+            <Button variant="outline" onClick={() => onEnterAnnotationMode('image')}>
+                <ImageUp className="mr-2 h-4 w-4"/>
+                圖片
             </Button>
           </div>
         </div>
