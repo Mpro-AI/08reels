@@ -152,7 +152,7 @@ export default function VideoPage() {
             <Header title={video.title} />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center">
-                    <VideoPlayer src={video.videoUrl} videoRef={videoRef} />
+                    <VideoPlayer src={selectedVersion.videoUrl || video.videoUrl} videoRef={videoRef} />
                 </div>
                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
                     <SidePanel 

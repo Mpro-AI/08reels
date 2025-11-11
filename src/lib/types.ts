@@ -34,6 +34,7 @@ export type Version = {
   comments: Comment[];
   annotations: Annotation[];
   isCurrentActive: boolean;
+  videoUrl?: string;
 };
 
 export type Video = {
