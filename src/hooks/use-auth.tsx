@@ -24,6 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Automatically log in as admin for developer mode
+    const adminUser = mockUsers.find(u => u.role === 'admin');
+    if (adminUser) {
+      setUser(adminUser);
+    }
+  }, []);
+
   const login = useCallback(async (pin: string): Promise<boolean> => {
     const foundUser = mockUsers.find(u => u.pin === pin);
     
