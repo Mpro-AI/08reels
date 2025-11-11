@@ -9,7 +9,7 @@ import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore'; // 加入 orderBy
 import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {
@@ -28,17 +28,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const firestore = useFirestore();
-  const videosQuery = useMemo(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'videos'));
-  }, [firestore]);
-
-  const { data: videos, loading: videosLoading } = useCollection<Video>(videosQuery);
   
-  const sortedVideos = useMemo(() => {
-    if (!videos) return [];
-    return [...videos].sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
-  }, [videos]);
+  const videosQuery = useMemo(() => {
+    if (!firestore || !isAuthenticated) return null; // Wait for auth and firestore
+    // 加入排序,確保查詢正確
+    return query(
+      collection(firestore, 'videos'),
+      orderBy('uploadedAt', 'desc')
+    );
+  }, [firestore, isAuthenticated]);
+
+  const { data: videos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
+  
+  // 加入調試日誌
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎬 Videos loading:', videosLoading);
+      console.log('🎬 Videos data:', videos);
+      console.log('🎬 Videos error:', error);
+      console.log('🎬 Firestore:', firestore ? 'Connected' : 'Not connected');
+      console.log('🎬 Authenticated:', isAuthenticated);
+    }
+  }, [videos, videosLoading, error, firestore, isAuthenticated]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -46,7 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [authLoading, isAuthenticated, router, pathname]);
 
-  if (authLoading || !isAuthenticated) {
+  if (authLoading || (!isAuthenticated && pathname !== '/login')) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -58,7 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <AppLayoutContext.Provider value={{ videos: sortedVideos, loading: videosLoading }}>
+    <AppLayoutContext.Provider value={{ videos: videos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
@@ -77,8 +88,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </SidebarMenuItem>
               </SidebarMenu>
               <SidebarMenu className="mt-4">
-                  <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">專案列表</p>
-                  {videosLoading && !videos && Array.from({ length: 3 }).map((_, i) => (
+                  <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                    專案列表 {videos && videos.length > 0 && `(${videos.length})`}
+                  </p>
+                  
+                  {/* 載入中狀態 */}
+                  {videosLoading && Array.from({ length: 3 }).map((_, i) => (
                     <SidebarMenuItem key={i}>
                       <div className="flex items-center gap-2 p-2">
                         <Skeleton className="size-4" />
@@ -86,7 +101,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </div>
                     </SidebarMenuItem>
                   ))}
-                  {sortedVideos?.map(video => (
+                  
+                  {/* 錯誤狀態 */}
+                  {error && (
+                    <SidebarMenuItem>
+                      <div className="px-4 py-2 text-xs text-destructive">
+                        載入失敗
+                      </div>
+                    </SidebarMenuItem>
+                  )}
+                  
+                  {/* 空狀態 */}
+                  {!videosLoading && !error && videos?.length === 0 && (
+                    <SidebarMenuItem>
+                      <div className="px-4 py-2 text-xs text-muted-foreground">
+                        尚無影片專案
+                      </div>
+                    </SidebarMenuItem>
+                  )}
+                  
+                  {/* 影片列表 */}
+                  {videos?.map(video => (
                       <SidebarMenuItem key={video.id}>
                           <SidebarMenuButton asChild tooltip={video.title} isActive={pathname.startsWith(`/videos/${video.id}`)}>
                               <Link href={`/videos/${video.id}`}>

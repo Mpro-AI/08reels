@@ -23,13 +23,20 @@ export function useCollection<T>(
   const [error, setError] = useState<FirestoreError | null>(null);
 
   useEffect(() => {
-    if (!q) {
+    if (q === undefined) {
       setData(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    
+    if (q === null) {
+      setLoading(true);
+      setData(null);
+      setError(null);
+      return;
+    }
 
+    setLoading(true);
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -38,8 +45,10 @@ export function useCollection<T>(
         );
         setData(docs);
         setLoading(false);
+        setError(null);
       },
       (err) => {
+        console.error('Firestore error:', err);
         const permissionError = new FirestorePermissionError({
           // @ts-ignore
           path: q.path,
