@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
 
@@ -29,6 +29,7 @@ const getInitialUser = () => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(getInitialUser);
   const { toast } = useToast();
+  const isAuthenticated = !!user;
 
   const login = useCallback(async (pin: string): Promise<boolean> => {
     const foundUser = mockUsers.find(u => u.pin === pin);
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, setUserRole }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUserRole }}>
       {children}
     </AuthContext.Provider>
   );
