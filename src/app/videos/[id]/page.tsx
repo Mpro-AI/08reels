@@ -103,7 +103,7 @@ export default function VideoPage() {
     const onTimeUpdate = () => setCurrentTime(videoElement.currentTime);
     videoElement.addEventListener('timeupdate', onTimeUpdate);
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
-  }, []);
+  }, [playerRef, selectedVersion]);
   
   if (loading || !video || !selectedVersion) {
     return (
