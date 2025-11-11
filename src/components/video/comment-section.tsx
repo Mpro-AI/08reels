@@ -56,6 +56,11 @@ export default function CommentSection({
     return user.role === 'admin' || user.id === comment.author.id;
   }
 
+  const handleAnnotationButtonClick = (e: React.MouseEvent, timecode: number, mode: AnnotationMode) => {
+    e.stopPropagation();
+    onAnnotationClick(timecode, mode);
+  }
+
   return (
     <Card className="border-0 shadow-none">
       <CardHeader>
@@ -104,19 +109,19 @@ export default function CommentSection({
                     "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
                     "opacity-0 group-hover/comment:opacity-100 transition-opacity"
                 )}>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'pen')}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'pen')}>
                         <PenLine className="h-3.5 w-3.5"/>
                     </Button>
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'text')}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'text')}>
                         <Type className="h-3.5 w-3.5"/>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'image')}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'image')}>
                         <ImageUp className="h-3.5 w-3.5"/>
                     </Button>
                     {canDelete(comment) && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive">
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
                                     <Trash2 className="h-3.5 w-3.5"/>
                                 </Button>
                             </AlertDialogTrigger>

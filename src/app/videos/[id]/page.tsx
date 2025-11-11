@@ -74,7 +74,9 @@ export default function VideoPage() {
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (playerRef.current) {
       playerRef.current.currentTime = timecode;
-      playerRef.current.play();
+      if (playerRef.current.paused) {
+        playerRef.current.play();
+      }
     }
   }, []);
 
@@ -183,41 +185,54 @@ export default function VideoPage() {
     }
   };
 
-  const handleAddAnnotation = (data: PenAnnotationData, type: 'pen') => {
+  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => {
     if (!user) return;
-
+  
     const commonData = {
       author: { id: user.id, name: user.name },
       createdAt: new Date().toISOString(),
       timecode: Math.floor(currentTime),
     };
-    
-    const newAnnotation: Annotation = {
+  
+    let annotationData: Annotation;
+  
+    if (type === 'pen') {
+      annotationData = {
         id: `new-${Date.now()}`,
-        type: type,
-        data: data,
+        type: 'pen',
+        data: data as PenAnnotationData,
         ...commonData,
-    };
-    
-    setNewAnnotations(prev => [...prev, newAnnotation]);
+      };
+    } else if (type === 'text') {
+      annotationData = {
+        id: `new-${Date.now()}`,
+        type: 'text',
+        data: data as TextAnnotationData,
+        ...commonData,
+      };
+    } else {
+      return;
+    }
+  
+    setNewAnnotations(prev => [...prev, annotationData]);
   };
-
+  
   const handleEnterTextMode = (coords: { x: number; y: number }) => {
     setTextAnnotationCoords(coords);
     setIsTextAnnotating(true);
   };
-
+  
   const handleCompleteTextAnnotation = (text: string) => {
     if (!user || !textAnnotationCoords) return;
-
+  
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+  
     const fontSize = 32;
     ctx.font = `${fontSize}px sans-serif`;
     const textMetrics = ctx.measureText(text);
-
+  
     const textData: TextAnnotationData = {
       text,
       x: textAnnotationCoords.x - textMetrics.width / 2,
@@ -228,7 +243,7 @@ export default function VideoPage() {
       color: penColor,
       rotation: 0,
     };
-
+  
     const newAnnotation: Annotation = {
       id: `new-${Date.now()}`,
       type: 'text',
@@ -237,11 +252,12 @@ export default function VideoPage() {
       createdAt: new Date().toISOString(),
       timecode: Math.floor(currentTime),
     };
-
+  
     setNewAnnotations(prev => [...prev, newAnnotation]);
     setIsTextAnnotating(false);
     setTextAnnotationCoords(null);
-    setAnnotationMode('select'); // Switch to select to allow interaction with the new text
+    setIsAnnotating(false);
+    setAnnotationMode('select');
     toast({ title: '文字註解已新增' });
   };
 
