@@ -4,7 +4,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { videos } from '@/lib/mock-data';
 import { Film, LogOut, Home } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <SidebarMenu className="mt-4">
+            {/* <SidebarMenu className="mt-4">
                 <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">專案列表</p>
                 {videos.map(video => (
                     <SidebarMenuItem key={video.id}>
@@ -62,7 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))}
-            </SidebarMenu>
+            </SidebarMenu> */}
         </SidebarContent>
         <div className="p-4 mt-auto">
              <Button variant="ghost" className="w-full justify-start gap-2 p-2 group-data-[collapsible=icon]:justify-center" onClick={() => logout()}>

@@ -2,7 +2,14 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
-import { users } from '@/lib/mock-data';
+// import { users } from '@/lib/mock-data'; // Will be replaced by firestore
+
+// This will be replaced by fetching from firestore
+const mockUsers: User[] = [
+  { id: 'user-1', name: 'Admin User', role: 'admin' },
+  { id: 'user-2', name: '員工 A', role: 'employee' },
+  { id: 'user-3', name: '員工 B', role: 'employee' },
+];
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -16,9 +23,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock PINs for demo purposes
 const PINS: Record<string, User> = {
-  '2652': users.find(u => u.role === 'admin')!,
-  '3768': users.find(u => u.role === 'employee' && u.name === '員工 A')!,
-  '9564': users.find(u => u.role === 'employee' && u.name === '員工 B')!,
+  '2652': mockUsers.find(u => u.role === 'admin')!,
+  '3768': mockUsers.find(u => u.role === 'employee' && u.name === '員工 A')!,
+  '9564': mockUsers.find(u => u.role === 'employee' && u.name === '員工 B')!,
 };
 
 
@@ -47,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   
   const setUserRole = useCallback((role: UserRole) => {
-    const newUser = users.find(u => u.role === role);
+    const newUser = mockUsers.find(u => u.role === role);
     if(newUser) {
       setUser(newUser);
     }

@@ -1,0 +1,190 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user in the system.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The unique identifier for the user."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user.",
+          "enum": ["admin", "employee"]
+        }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Represents a comment on a video version.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "timecode": {
+          "type": "number"
+        },
+        "timecodeFormatted": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "author": {
+          "$ref": "#/backend/entities/UserReference"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "timecode", "timecodeFormatted", "text", "author", "createdAt"]
+    },
+    "Annotation": {
+      "title": "Annotation",
+      "description": "Represents an annotation on a video version.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["pen", "text", "image"]
+        },
+        "data": {
+          "type": "object"
+        },
+        "author": {
+          "$ref": "#/backend/entities/UserReference"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "type", "data", "author", "createdAt"]
+    },
+    "Version": {
+      "title": "Version",
+      "description": "Represents a version of a video.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "versionNumber": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending_review", "needs_changes", "approved", "rejected"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "uploader": {
+          "$ref": "#/backend/entities/UserReference"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/Comment"
+          }
+        },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/Annotation"
+          }
+        },
+        "isCurrentActive": {
+          "type": "boolean"
+        },
+        "videoUrl": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "versionNumber", "status", "createdAt", "uploader", "comments", "annotations", "isCurrentActive"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Represents a video project.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "type": "string"
+        },
+        "thumbnailHint": {
+          "type": "string"
+        },
+        "assignedTo": {
+          "$ref": "#/backend/entities/UserReference"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/backend/entities/Version"
+          }
+        },
+        "videoUrl": {
+          "type": "string"
+        },
+        "videoDataUri": {
+            "type": "string"
+        }
+      },
+      "required": ["id", "title", "thumbnailUrl", "assignedTo", "uploadedAt", "versions", "videoUrl"]
+    },
+    "UserReference": {
+      "title": "User Reference",
+      "description": "A reference to a user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"]
+    }
+  },
+  "auth": {
+    "providers": []
+  },
+  "firestore": {
+    "/videos/{videoId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Video"
+      },
+      "description": "Collection of all video projects."
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/backend/entities/User"
+      },
+      "description": "Collection of all users."
+    }
+  }
+}

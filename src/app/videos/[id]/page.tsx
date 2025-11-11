@@ -5,7 +5,6 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
-import { videos as initialVideos } from '@/lib/mock-data';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -23,12 +22,9 @@ export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
   
-  const [videos, setVideos] = useState(initialVideos);
-  const [video, setVideo] = useState<Video | undefined>(videos.find(v => v.id === videoId));
+  const [video, setVideo] = useState<Video | undefined>(undefined);
 
-  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(
-    video?.versions.find(v => v.isCurrentActive)?.id || video?.versions[0]?.id
-  );
+  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -38,12 +34,8 @@ export default function VideoPage() {
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
   useEffect(() => {
-    const currentVideo = videos.find(v => v.id === videoId);
-    setVideo(currentVideo);
-    if (currentVideo) {
-      setSelectedVersionId(currentVideo.versions.find(v => v.isCurrentActive)?.id || currentVideo.versions[0]?.id);
-    }
-  }, [videoId, videos]);
+    // This will be replaced with data fetching
+  }, [videoId]);
 
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (videoRef.current) {
@@ -66,56 +58,38 @@ export default function VideoPage() {
       createdAt: new Date().toISOString(),
     };
 
-    const updatedVideos = videos.map(v => {
-      if (v.id === video.id) {
-        return {
-          ...v,
-          versions: v.versions.map(ver => {
-            if (ver.id === selectedVersionId) {
-              return {
-                ...ver,
-                comments: [...ver.comments, newComment],
-              };
-            }
-            return ver;
-          }),
-        };
-      }
-      return v;
-    });
+    // This logic will be moved to a Firestore update
+    const updatedVideo = { ...video };
+    const versionIndex = updatedVideo.versions.findIndex(v => v.id === selectedVersionId);
+    if (versionIndex !== -1) {
+      updatedVideo.versions[versionIndex].comments.push(newComment);
+      setVideo(updatedVideo);
+    }
 
-    setVideos(updatedVideos);
-
-  }, [video, user, currentTime, videos, selectedVersionId]);
+  }, [video, user, currentTime, selectedVersionId]);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
     if (!video) return;
 
-    const updatedVideos = videos.map(v => {
-      if (v.id === video.id) {
-        let isNewActiveVersion = status === 'approved';
-
-        const newVersions = v.versions.map(ver => {
-          if (ver.id === versionId) {
-            return { ...ver, status, isCurrentActive: isNewActiveVersion };
-          }
-          // If a new version is approved, all other versions are no longer active
-          if (isNewActiveVersion) {
-            return { ...ver, isCurrentActive: false };
-          }
-          return ver;
-        });
-
-        return { ...v, versions: newVersions };
+    let isNewActiveVersion = status === 'approved';
+    const updatedVideo = { ...video };
+    updatedVideo.versions = updatedVideo.versions.map(ver => {
+      let newVer = {...ver};
+      if (ver.id === versionId) {
+        newVer.status = status;
+        newVer.isCurrentActive = isNewActiveVersion;
+      } else if (isNewActiveVersion) {
+        newVer.isCurrentActive = false;
       }
-      return v;
+      return newVer;
     });
+
+    setVideo(updatedVideo);
     
-    setVideos(updatedVideos);
     toast({
       title: '版本狀態已更新',
     });
-  }, [video, videos, toast]);
+  }, [video, toast]);
 
 
   useEffect(() => {
