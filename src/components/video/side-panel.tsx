@@ -6,7 +6,7 @@ import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import AiSuggestionSection from './ai-suggestion-section';
 import { Video, Version, VersionStatus } from '@/lib/types';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAppAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
   video: Video;
@@ -19,7 +19,7 @@ interface SidePanelProps {
 }
 
 export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment, onVersionStatusChange }: SidePanelProps) {
-  const { user } = useAuth();
+  const { user } = useAppAuth();
   const [commentInput, setCommentInput] = useState('');
 
   const handleSuggestionToComment = (content: string) => {

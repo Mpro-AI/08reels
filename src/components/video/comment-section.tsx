@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Comment } from '@/lib/types';
 import { format } from 'date-fns';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAppAuth } from '@/hooks/use-auth';
 
 interface CommentSectionProps {
   comments: Comment[];
@@ -17,7 +17,7 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ comments, onCommentClick, currentTimeFormatted, onAddComment, inputValue, onInputValueChange }: CommentSectionProps) {
-  const { user } = useAuth();
+  const { user } = useAppAuth();
 
   const handleAddComment = () => {
     if (inputValue.trim() && user) {

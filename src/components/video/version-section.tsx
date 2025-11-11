@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Version, VersionStatus } from '@/lib/types';
 import { GitBranch, Check, X, Edit, Upload, Star } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -73,7 +73,7 @@ const StatusButton = ({
 
 
 export default function VersionSection({ versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
-    const { user } = useAuth();
+    const { user } = useAppAuth();
 
   return (
     <Card className="border-0 shadow-none">

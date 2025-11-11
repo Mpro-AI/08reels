@@ -7,12 +7,12 @@ import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { setVideo, addCommentToVersion, setVersionStatus } from '@/firebase/firestore/videos';
+import { addCommentToVersion, setVersionStatus } from '@/firebase/firestore/videos';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -37,7 +37,7 @@ export default function VideoPage() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>();
   const playerRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const { user } = useAuth();
+  const { user } = useAppAuth();
   const { toast } = useToast();
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);

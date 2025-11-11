@@ -7,6 +7,7 @@ import {
   Timestamp,
   Firestore,
   runTransaction,
+  collection,
 } from 'firebase/firestore';
 import type { Video, Comment, VersionStatus } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -47,9 +48,9 @@ export function addCommentToVersion(
       throw 'Version does not exist!';
     }
 
-    const newComment = {
+    const newComment: Comment = {
       ...commentData,
-      id: doc(collection(db, 'videos')).id, // Generate a unique ID
+      id: doc(collection(db, 'videos')).id, // Firestore can generate an ID without creating a doc
       createdAt: Timestamp.now().toDate().toISOString(),
     };
     
@@ -87,8 +88,8 @@ export function setVersionStatus(
             if (v.id === versionId) {
                 return { ...v, status, isCurrentActive: isNewActiveVersion };
             }
+            // If we're approving a new version, ensure all others are not active
             if (isNewActiveVersion) {
-                // If we're approving a version, all other versions are no longer active
                 return { ...v, isCurrentActive: false };
             }
             return v;
