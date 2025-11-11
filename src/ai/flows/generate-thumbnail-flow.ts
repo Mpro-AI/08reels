@@ -1,4 +1,4 @@
-'use server';
+'use client';
 /**
  * @fileOverview A flow for generating video thumbnails using AI.
  * 
@@ -15,6 +15,8 @@ const GenerateThumbnailInputSchema = z.object({
 });
 export type GenerateThumbnailInput = z.infer<typeof GenerateThumbnailInputSchema>;
 
+// This flow is no longer the primary method for thumbnail generation but is kept for potential future use.
+// The primary method is now client-side frame extraction in `src/firebase/storage.ts`.
 export async function generateThumbnail(input: GenerateThumbnailInput): Promise<string | null> {
     return generateThumbnailFlow(input);
 }

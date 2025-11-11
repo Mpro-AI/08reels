@@ -11,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,15 +18,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
-import { Loader2 } from 'lucide-react';
-import { uploadVideoAndGetUrl } from '@/firebase/storage';
+import { Loader2, Image as ImageIcon } from 'lucide-react';
+import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
+import Image from 'next/image';
+import { Skeleton } from '../ui/skeleton';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
-const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/avi"];
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/avi", "video/webm"];
 
 const formSchema = z.object({
   title: z.string().min(1, '標題為必填欄位'),
@@ -37,7 +38,7 @@ const formSchema = z.object({
     .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `檔案大小不能超過 1GB。`)
     .refine(
       files => ACCEPTED_VIDEO_TYPES.includes(files?.[0]?.type),
-      "不支援的檔案格式，僅支援 MP4 / MOV / AVI。"
+      "不支援的檔案格式，僅支援 MP4, MOV, AVI, WEBM。"
     ),
 });
 
@@ -51,6 +52,8 @@ interface UploadVideoDialogProps {
 export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const firestore = useFirestore();
@@ -64,12 +67,42 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       videoFile: undefined
     }
   });
+
+  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      // Manually set the value for react-hook-form
+      form.setValue('videoFile', files, { shouldValidate: true });
+
+      setThumbnailPreview(null);
+      setIsGeneratingThumbnail(true);
+      try {
+        const thumbnailBlob = await generateVideoThumbnail(file);
+        setThumbnailPreview(URL.createObjectURL(thumbnailBlob));
+      } catch (error) {
+        console.error("Thumbnail generation failed:", error);
+        toast({
+          variant: 'destructive',
+          title: '縮圖預覽生成失敗',
+          description: '無法從此影片生成預覽，但仍可繼續上傳。',
+        });
+      } finally {
+        setIsGeneratingThumbnail(false);
+      }
+    } else {
+      form.resetField('videoFile');
+      setThumbnailPreview(null);
+    }
+  };
   
   useEffect(() => {
     if(isOpen) {
       form.reset();
       setIsSubmitting(false);
       setUploadProgress(0);
+      setThumbnailPreview(null);
+      setIsGeneratingThumbnail(false);
     }
   }, [isOpen, form]);
 
@@ -89,7 +122,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     try {
         const videoFile = data.videoFile[0];
 
-        const { downloadURL, videoId } = await uploadVideoAndGetUrl(
+        const { downloadURL, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(
           storage, 
           videoFile, 
           setUploadProgress
@@ -98,6 +131,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
         const newVideoData = {
             title: data.title,
             videoUrl: downloadURL,
+            thumbnailUrl: thumbnailUrl,
             notes: data.notes,
         };
         await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
@@ -115,7 +149,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
   };
   
   const isUploading = isSubmitting && uploadProgress > 0 && uploadProgress < 100;
-  const fileRef = form.register("videoFile");
+  // We don't use fileRef here anymore because we have a custom onChange handler
+  // const fileRef = form.register("videoFile");
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -126,8 +161,6 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
               <DialogTitle>上傳新專案影片</DialogTitle>
               <DialogDescription>
                 請提供影片標題並選擇影片檔案來建立一個新的專案。
-                <br/>
-                <span className="text-xs text-muted-foreground">僅支援 MP4 / MOV / AVI，單檔上限：1GB。</span>
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -165,14 +198,25 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                        <Input 
                           type="file" 
                           className="col-span-3"
-                          accept="video/mp4,video/quicktime,video/x-msvideo,video/avi" 
+                          accept={ACCEPTED_VIDEO_TYPES.join(',')}
                           disabled={isSubmitting}
-                          {...fileRef}
+                          onChange={handleVideoFileChange}
                        />
                     </FormControl>
                   </FormItem>
                 )}
               />
+              {thumbnailPreview || isGeneratingThumbnail ? (
+                 <div className="col-span-4 space-y-2">
+                    <Label>縮圖預覽</Label>
+                    <div className="aspect-video w-full rounded-md overflow-hidden relative bg-muted flex items-center justify-center">
+                      {isGeneratingThumbnail && <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />}
+                      {thumbnailPreview && !isGeneratingThumbnail && (
+                        <Image src={thumbnailPreview} alt="Video thumbnail preview" fill className="object-contain" />
+                      )}
+                    </div>
+                 </div>
+              ) : null}
                {(form.formState.errors.title || form.formState.errors.videoFile) && (
                   <div className="col-span-4">
                     <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>

@@ -13,7 +13,6 @@ import {
 import type { Video, Comment, VersionStatus, User, Version, Annotation } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { generateThumbnail } from '@/ai/flows/generate-thumbnail-flow';
 
 export function setVideo(
   db: Firestore,
@@ -237,7 +236,7 @@ export function setVersionStatus(
 export async function addVideo(
     db: Firestore,
     videoId: string,
-    newVideoData: { title: string; videoUrl: string; notes?: string },
+    newVideoData: { title: string; videoUrl: string; thumbnailUrl?: string; notes?: string },
     author: Pick<User, 'id' | 'name'>
 ) {
     const videoRef = doc(db, 'videos', videoId);
@@ -255,23 +254,10 @@ export async function addVideo(
             notes: newVideoData.notes,
         };
 
-        let thumbnailUrl = 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video';
-        try {
-            const result = await generateThumbnail({
-                title: newVideoData.title,
-                notes: newVideoData.notes || '',
-            });
-            if (result) {
-                thumbnailUrl = result;
-            }
-        } catch (e) {
-            console.error('AI thumbnail generation failed, falling back to placeholder.', e);
-        }
-
         const newVideo: Omit<Video, 'id'> = {
             title: newVideoData.title,
-            thumbnailUrl,
-            thumbnailHint: `${newVideoData.title} ${newVideoData.notes || ''}`.trim(),
+            thumbnailUrl: newVideoData.thumbnailUrl || 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video',
+            thumbnailHint: 'video thumbnail', // Keep this simple as the thumbnail is now literal
             author: author,
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
