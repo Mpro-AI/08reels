@@ -1,10 +1,10 @@
 export const getFirebaseConfig = () => {
   return {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "reels-08-c3492.firebaseapp.com",
-    projectId: "reels-08-c3492",
-    storageBucket: "reels-08-c3492.appspot.com",
-    messagingSenderId: "362923762233",
-    appId: "1:362923762233:web:9b8f3c7e7d6a3b1e8d4f3c",
+    apiKey: "AIzaSyBbC91VW9H4BD-umEFuEQVE0R_abfY5P84",
+    authDomain: "studio-3640087795-37708.firebaseapp.com",
+    projectId: "studio-3640087795-37708",
+    storageBucket: "studio-3640087795-37708.firebasestorage.app",
+    messagingSenderId: "352710385631",
+    appId: "1:352710385631:web:2e37297b78b384981aee6a"
   };
 };

@@ -9,7 +9,12 @@ service cloud.firestore {
     }
 
     function isOwner(videoData) {
-      return request.auth.uid == videoData.author.id;
+      // An owner is the author of the video OR an admin user
+      return request.auth.uid == videoData.author.id || isAdmin();
+    }
+
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
 
     // Rules for the 'users' collection
