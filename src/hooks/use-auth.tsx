@@ -1,7 +1,15 @@
 'use client';
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { User, UserRole } from '@/lib/types';
+import { User } from '@/lib/types';
+import { 
+  useAuth as useFirebaseAuth 
+} from '@/firebase';
+import {
+  signInAnonymously,
+  onAuthStateChanged,
+  signOut
+} from 'firebase/auth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -13,7 +21,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Re-introducing mock user data for local testing
 export const mockUsers: User[] = [
     { id: 'user-admin', name: 'Admin User', role: 'admin', pin: '2652' },
     { id: 'user-employee-a', name: '員工 A', role: 'employee', pin: '3768' },
@@ -24,12 +31,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const firebaseAuth = useFirebaseAuth();
 
   useEffect(() => {
-    // On initial load, we can check if a user is saved in localStorage,
-    // but for now, we'll start with no user.
-    setLoading(false);
-  }, []);
+    if (!firebaseAuth) {
+      setLoading(false);
+      return;
+    }
+    
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      // If there is a firebase user but no local user, it means the page was reloaded.
+      // For this mock setup, we'll just log out. A real app might persist the user role.
+      if (firebaseUser && !user) {
+        // To keep it simple, if there's a Firebase session but no local PIN-based user,
+        // we'll sign out to force a PIN login again on refresh.
+        signOut(firebaseAuth);
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseAuth, user]);
   
   const isAuthenticated = !!user;
 
@@ -37,14 +60,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     const foundUser = mockUsers.find(u => u.pin === pin);
     
-    if (foundUser) {
-      setUser(foundUser);
-      toast({
-        title: `歡迎， ${foundUser.name}`,
-        description: `您已成功以 ${foundUser.role} 身份登入。`,
-      });
-      setLoading(false);
-      return true;
+    if (foundUser && firebaseAuth) {
+      try {
+        await signInAnonymously(firebaseAuth);
+        setUser(foundUser);
+        toast({
+          title: `歡迎， ${foundUser.name}`,
+          description: `您已成功以 ${foundUser.role} 身份登入。`,
+        });
+        setLoading(false);
+        return true;
+      } catch (error) {
+        console.error("Firebase anonymous sign-in failed", error);
+        toast({
+          variant: 'destructive',
+          title: '登入失敗',
+          description: '無法與認證服務連線。',
+        });
+        setLoading(false);
+        return false;
+      }
     } else {
       toast({
         variant: 'destructive',
@@ -54,18 +89,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return false;
     }
-  }, [toast]);
+  }, [toast, firebaseAuth]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     setLoading(true);
+    if (firebaseAuth) {
+      await signOut(firebaseAuth);
+    }
     setUser(null);
     toast({
       title: '已登出',
       description: '您已成功登出。',
     });
-    // A small delay to allow state to update before redirect happens
     setTimeout(() => setLoading(false), 50);
-  }, [toast]);
+  }, [toast, firebaseAuth]);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout }}>
