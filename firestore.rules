@@ -21,7 +21,7 @@ service cloud.firestore {
     // Rules for the 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if false; // Users collection is not used in this app
+      allow write: if request.auth.uid == userId; 
     }
     
     // Rules for the 'videos' collection
