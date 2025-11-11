@@ -5,7 +5,7 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
-import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
@@ -24,7 +24,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-type AnnotationMode = 'pen' | 'image' | null;
+type AnnotationMode = 'pen' | 'image' | 'text' | null;
 
 export default function VideoPage() {
   const params = useParams();
@@ -144,7 +144,7 @@ export default function VideoPage() {
     }
   };
 
-  const handleAddAnnotation = async (data: PenAnnotationData | { x: number, y: number }) => {
+  const handleAddAnnotation = async (data: PenAnnotationData | { x: number; y: number } | TextAnnotationData) => {
     if (!user) return;
 
     let newAnnotation: Omit<Annotation, 'id'> | null = null;
@@ -154,12 +154,19 @@ export default function VideoPage() {
       timecode: Math.floor(currentTime),
     };
 
-    if (annotationMode === 'pen') {
+    if (annotationMode === 'pen' && 'path' in data) {
       newAnnotation = {
         type: 'pen',
         data: data as PenAnnotationData,
         ...commonData,
       };
+    } else if (annotationMode === 'text' && 'text' in data) {
+        newAnnotation = {
+            type: 'text',
+            data: data as TextAnnotationData,
+            ...commonData,
+        };
+        setAnnotationMode(null);
     } else if (annotationMode === 'image' && imageAnnotationFile && 'x' in data) {
       setIsUploading(true);
       try {
@@ -168,33 +175,32 @@ export default function VideoPage() {
         const imageWidth = 200; 
         const tempImage = new Image();
         tempImage.src = URL.createObjectURL(imageAnnotationFile);
-        tempImage.onload = () => {
-          const aspectRatio = tempImage.width / tempImage.height;
-          const imageHeight = imageWidth / aspectRatio;
+        await new Promise(resolve => tempImage.onload = resolve);
+        const aspectRatio = tempImage.width / tempImage.height;
+        const imageHeight = imageWidth / aspectRatio;
+        URL.revokeObjectURL(tempImage.src);
 
-          const imageAnnotation: Omit<Annotation, 'id'> = {
+        const imageAnnotation: Omit<Annotation, 'id'> = {
             type: 'image',
             data: {
-              url: imageUrl,
-              x: data.x - imageWidth / 2, // Center the image on the click
-              y: data.y - imageHeight / 2,
-              width: imageWidth,
-              height: imageHeight,
-              rotation: 0,
+                url: imageUrl,
+                x: data.x - imageWidth / 2,
+                y: data.y - imageHeight / 2,
+                width: imageWidth,
+                height: imageHeight,
+                rotation: 0,
             } as ImageAnnotationData,
             ...commonData,
-          };
-           setNewAnnotations(prev => [...prev, { ...imageAnnotation, id: `new-${Date.now()}` } as Annotation]);
-           URL.revokeObjectURL(tempImage.src);
         };
+        setNewAnnotations(prev => [...prev, { ...imageAnnotation, id: `new-${Date.now()}` } as Annotation]);
         
       } catch (error) {
         toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
         console.error(error);
       } finally {
         setIsUploading(false);
-        setImageAnnotationFile(null); // Clear the file after processing
-        setAnnotationMode(null); // Exit image mode after placing
+        setImageAnnotationFile(null);
+        setAnnotationMode(null);
       }
     }
     

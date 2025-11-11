@@ -30,10 +30,22 @@ export type ImageAnnotationData = {
   rotation: number; // in radians
 };
 
+export type TextAnnotationData = {
+  text: string;
+  x: number;
+  y: number;
+  width: number; // For bounding box calculation and interaction
+  height: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  rotation: number; // in radians
+};
+
 export type Annotation = {
     id: string;
     type: 'pen' | 'text' | 'image';
-    data: PenAnnotationData | ImageAnnotationData | any;
+    data: PenAnnotationData | ImageAnnotationData | TextAnnotationData;
     author: Pick<User, 'id' | 'name'>;
     createdAt: string;
     timecode: number;

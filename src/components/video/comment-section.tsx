@@ -1,5 +1,5 @@
 'use client';
-import { MessageSquare, Plus, PenLine, Trash2, ImageUp } from 'lucide-react';
+import { MessageSquare, Plus, PenLine, Trash2, ImageUp, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +28,7 @@ interface CommentSectionProps {
   inputValue: string;
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
-  onEnterAnnotationMode: (mode: 'pen' | 'image') => void;
+  onEnterAnnotationMode: (mode: 'pen' | 'image' | 'text') => void;
 }
 
 export default function CommentSection({ 
@@ -108,6 +108,9 @@ export default function CommentSection({
                     </Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('image'); }}>
                         <ImageUp className="h-3.5 w-3.5"/>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('text'); }}>
+                        <Type className="h-3.5 w-3.5"/>
                     </Button>
                     {canDelete(comment) && (
                         <AlertDialog>

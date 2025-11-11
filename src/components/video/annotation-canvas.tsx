@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Annotation, PenAnnotationData, ImageAnnotationData } from '@/lib/types';
+import { Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
 
 interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData | { x: number; y: number }) => void;
+  onAddAnnotation: (data: PenAnnotationData | { x: number; y: number } | TextAnnotationData) => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
-  annotationMode: 'pen' | 'image' | null;
+  annotationMode: 'pen' | 'image' | 'text' | null;
   isAnnotating: boolean;
 }
 
@@ -78,6 +78,23 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     ctx.stroke();
   };
 
+  const drawTextAnnotation = (ctx: CanvasRenderingContext2D, data: TextAnnotationData, isSelected: boolean) => {
+    ctx.save();
+    ctx.translate(data.x + data.width / 2, data.y + data.height / 2);
+    ctx.rotate(data.rotation);
+    ctx.font = `${data.fontSize}px ${data.fontFamily}`;
+    ctx.fillStyle = data.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(data.text, 0, 0);
+    ctx.restore();
+
+    if (isSelected) {
+      drawSelectionHandles(ctx, data);
+    }
+  };
+
+
   const drawImageAnnotation = (ctx: CanvasRenderingContext2D, data: ImageAnnotationData, isSelected: boolean) => {
     const img = imageCache.current.get(data.url);
     if (!img) {
@@ -103,7 +120,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     }
   };
 
-  const drawSelectionHandles = (ctx: CanvasRenderingContext2D, data: ImageAnnotationData) => {
+  const drawSelectionHandles = (ctx: CanvasRenderingContext2D, data: ImageAnnotationData | TextAnnotationData) => {
       ctx.save();
       ctx.translate(data.x + data.width / 2, data.y + data.height / 2);
       ctx.rotate(data.rotation);
@@ -142,9 +159,11 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     annotations.forEach((annotation) => {
       const isSelected = annotation.id === selectedAnnotationId;
       if (annotation.type === 'pen') {
-        drawPenAnnotation(ctx, annotation.data);
+        drawPenAnnotation(ctx, annotation.data as PenAnnotationData);
       } else if (annotation.type === 'image') {
         drawImageAnnotation(ctx, annotation.data as ImageAnnotationData, isSelected);
+      } else if (annotation.type === 'text') {
+        drawTextAnnotation(ctx, annotation.data as TextAnnotationData, isSelected);
       }
     });
 
@@ -164,8 +183,8 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     // Iterate backwards to select the top-most annotation
     for (let i = annotations.length - 1; i >= 0; i--) {
         const annotation = annotations[i];
-        if (annotation.type === 'image') {
-            const data = annotation.data as ImageAnnotationData;
+        if (annotation.type === 'image' || annotation.type === 'text') {
+            const data = annotation.data as ImageAnnotationData | TextAnnotationData;
             const centerX = data.x + data.width / 2;
             const centerY = data.y + data.height / 2;
 
@@ -188,7 +207,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   };
   
   const getActionForPoint = (point: {x:number, y:number}, annotation: Annotation): Action => {
-      const data = annotation.data as ImageAnnotationData;
+      const data = annotation.data as ImageAnnotationData | TextAnnotationData;
       const centerX = data.x + data.width / 2;
       const centerY = data.y + data.height / 2;
   
@@ -233,6 +252,32 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
        return;
     }
 
+    if (annotationMode === 'text') {
+        const text = prompt('請輸入文字內容：');
+        if (text) {
+            const ctx = getCanvasContext();
+            if (!ctx) return;
+            const fontSize = 24;
+            const fontFamily = 'Arial';
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            const textMetrics = ctx.measureText(text);
+
+            const textData: TextAnnotationData = {
+                text,
+                x: coords.x - textMetrics.width / 2,
+                y: coords.y - fontSize / 2,
+                width: textMetrics.width,
+                height: fontSize,
+                fontSize,
+                fontFamily,
+                color: '#FF0000',
+                rotation: 0,
+            };
+            onAddAnnotation(textData);
+        }
+        return;
+    }
+
     // Interaction with existing annotations
     const selected = getAnnotationAtPoint(coords);
     setSelectedAnnotationId(selected?.id || null);
@@ -252,9 +297,9 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     if (!coords) return;
     
     const selectedAnnotation = annotations.find(a => a.id === selectedAnnotationId);
-    if (!selectedAnnotation) return;
+    if (!selectedAnnotation || (selectedAnnotation.type !== 'image' && selectedAnnotation.type !== 'text')) return;
     
-    let updatedData = { ...selectedAnnotation.data };
+    let updatedData = { ...selectedAnnotation.data } as ImageAnnotationData | TextAnnotationData;
     
     if (action === 'drawing') {
         setCurrentPath((prev) => [...prev, coords]);
@@ -278,8 +323,14 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         updatedData.height += rotatedDy;
 
         if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey) {
-            const originalAspectRatio = selectedAnnotation.data.width / selectedAnnotation.data.height;
-            updatedData.height = updatedData.width / originalAspectRatio;
+            if (selectedAnnotation.type === 'image') {
+              const originalAspectRatio = selectedAnnotation.data.width / selectedAnnotation.data.height;
+              updatedData.height = updatedData.width / originalAspectRatio;
+            }
+        }
+        
+        if (selectedAnnotation.type === 'text') {
+          (updatedData as TextAnnotationData).fontSize = updatedData.height;
         }
 
     } else if (action === 'rotating') {
@@ -287,7 +338,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const centerY = selectedAnnotation.data.y + selectedAnnotation.data.height / 2;
         const startAngle = Math.atan2(startPoint.y - centerY, startPoint.x - centerX);
         const currentAngle = Math.atan2(coords.y - centerY, coords.x - centerX);
-        updatedData.rotation = selectedAnnotation.data.rotation + (currentAngle - startAngle);
+        updatedData.rotation = (selectedAnnotation.data as ImageAnnotationData | TextAnnotationData).rotation + (currentAngle - startAngle);
     }
 
     onUpdateAnnotation({ ...selectedAnnotation, data: updatedData });
@@ -311,7 +362,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   // #endregion
 
   const cursor = () => {
-    if(annotationMode === 'image') return 'crosshair';
+    if(annotationMode === 'image' || annotationMode === 'text') return 'crosshair';
     if(annotationMode === 'pen') return 'auto';
     if(action === 'dragging') return 'grabbing';
     if(action === 'resizing') return 'nwse-resize';
