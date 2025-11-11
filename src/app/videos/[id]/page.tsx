@@ -370,7 +370,7 @@ export default function VideoPage() {
     <>
         <Header title={video.title} />
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
-            <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
+            <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex flex-col items-center justify-center relative">
                 <VideoPlayer 
                   src={selectedVersion.videoUrl} 
                   poster={video.thumbnailUrl}
