@@ -119,13 +119,6 @@ export default function VideoPage() {
     setIsDrawing(true);
   };
 
-  const handleImageAnnotation = () => {
-    toast({
-      title: '功能開發中',
-      description: '「插入圖片」功能即將推出！'
-    });
-  };
-
   const handleAddAnnotation = (data: PenAnnotationData) => {
     if (!user) return;
     const newAnnotation: Annotation = {
@@ -218,7 +211,6 @@ export default function VideoPage() {
                         onVersionStatusChange={handleVersionStatusChange}
                         onDeleteComment={handleDeleteComment}
                         onPenAnnotation={handlePenAnnotation}
-                        onImageAnnotation={handleImageAnnotation}
                     />
                 </div>
             </main>

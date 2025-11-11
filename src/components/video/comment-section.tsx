@@ -1,5 +1,5 @@
 'use client';
-import { MessageSquare, Plus, PenLine, ImagePlus, Trash2 } from 'lucide-react';
+import { MessageSquare, Plus, PenLine, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,7 +29,6 @@ interface CommentSectionProps {
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
   onPenAnnotation: () => void;
-  onImageAnnotation: () => void;
 }
 
 export default function CommentSection({ 
@@ -41,7 +40,6 @@ export default function CommentSection({
   onInputValueChange,
   onDeleteComment,
   onPenAnnotation,
-  onImageAnnotation,
 }: CommentSectionProps) {
   const { user } = useAppAuth();
 
@@ -105,32 +103,30 @@ export default function CommentSection({
                     </div>
                   <p className="text-foreground whitespace-pre-wrap">{comment.text}</p>
                 </div>
-                {user?.role === 'admin' && (
+                {canDelete(comment) && (
                     <div className={cn(
                         "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
                         "opacity-0 group-hover/comment:opacity-100 transition-opacity"
                     )}>
-                        {canDelete(comment) && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive">
-                                        <Trash2 className="h-3.5 w-3.5"/>
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            這個操作無法復原。這將會永久刪除此評論。
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>取消</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => onDeleteComment(comment.id)}>確定刪除</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive">
+                                    <Trash2 className="h-3.5 w-3.5"/>
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        這個操作無法復原。這將會永久刪除此評論。
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDeleteComment(comment.id)}>確定刪除</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 )}
               </div>

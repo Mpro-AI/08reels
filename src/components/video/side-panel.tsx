@@ -16,8 +16,7 @@ interface SidePanelProps {
   onAddComment: (commentText: string, timecode?: number) => void;
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
   onDeleteComment: (commentId: string) => void;
-  onPenAnnotation: (commentId: string) => void;
-  onImageAnnotation: (commentId: string) => void;
+  onPenAnnotation: () => void;
 }
 
 export default function SidePanel({ 
@@ -30,7 +29,6 @@ export default function SidePanel({
     onVersionStatusChange,
     onDeleteComment,
     onPenAnnotation,
-    onImageAnnotation,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
 
@@ -66,7 +64,6 @@ export default function SidePanel({
                     onInputValueChange={setCommentInput}
                     onDeleteComment={onDeleteComment}
                     onPenAnnotation={onPenAnnotation}
-                    onImageAnnotation={onImageAnnotation}
                 />
             </TabsContent>
             <TabsContent value="versions" className="m-0">
