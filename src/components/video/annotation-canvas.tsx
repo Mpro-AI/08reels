@@ -9,7 +9,7 @@ interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData) => void;
+  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
   annotationMode: AnnotationMode;
   penColor: string;
@@ -274,7 +274,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                 color: penColor,
                 rotation: 0,
             };
-            onAddAnnotation(textData);
+            onAddAnnotation(textData, 'text');
         }
         return;
     }
@@ -321,17 +321,19 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const cosR = Math.cos(updatedData.rotation);
         const rotatedDx = dx * cosR + dy * sinR;
         const rotatedDy = dy * cosR - dx * sinR;
+        
+        const originalWidth = updatedData.width;
+        const originalHeight = updatedData.height;
 
         updatedData.width += rotatedDx;
-        updatedData.height += rotatedDy;
-
-        if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey) {
-            if (selectedAnnotation.type === 'image' && (selectedAnnotation.data as ImageAnnotationData).width > 0) {
-              const originalAspectRatio = (selectedAnnotation.data as ImageAnnotationData).width / (selectedAnnotation.data as ImageAnnotationData).height;
-              updatedData.height = updatedData.width / originalAspectRatio;
-            }
-        }
         
+        if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey) {
+            const aspectRatio = originalWidth / originalHeight;
+            updatedData.height = updatedData.width / aspectRatio;
+        } else {
+            updatedData.height += rotatedDy;
+        }
+
         if (selectedAnnotation.type === 'text') {
           (updatedData as TextAnnotationData).fontSize = updatedData.height;
         }
@@ -355,7 +357,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         color: penColor,
         lineWidth: penLineWidth,
       };
-      onAddAnnotation(annotationData);
+      onAddAnnotation(annotationData, 'pen');
     }
     
     setAction('none');
@@ -374,7 +376,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     return 'default';
   }
 
-  const pointerEventsEnabled = annotationMode !== 'select' || (annotations && annotations.length > 0) || isAnnotating;
+  const pointerEventsEnabled = isAnnotating;
 
 
   return (

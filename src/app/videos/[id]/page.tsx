@@ -25,7 +25,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-export type AnnotationMode = 'pen' | 'text' | 'select';
+export type AnnotationMode = 'pen' | 'text' | 'select' | 'image';
 
 export default function VideoPage() {
   const params = useParams();
@@ -76,19 +76,14 @@ export default function VideoPage() {
     }
   }, []);
 
-  const handleAddComment = useCallback((commentText: string, timecode?: number) => {
+  const handleAddComment = useCallback((commentText: string) => {
     if (!firestore || !video || !user || !selectedVersionId) return;
     
-    const commentTime = timecode !== undefined ? timecode : currentTime;
-
-    const newComment: Omit<Comment, 'id' | 'createdAt'> = {
-      timecode: Math.floor(commentTime),
-      timecodeFormatted: formatTime(commentTime),
+    addCommentToVersion(firestore, video.id, selectedVersionId, {
+      timecode: Math.floor(currentTime),
+      timecodeFormatted: formatTime(currentTime),
       text: commentText,
-      author: user,
-    };
-    
-    addCommentToVersion(firestore, video.id, selectedVersionId, newComment);
+    }, user);
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
@@ -138,22 +133,19 @@ export default function VideoPage() {
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !storage || !user || !selectedVersionId || !video) {
-        // Reset file input if no file is selected
         if (imageAnnotationInputRef.current) imageAnnotationInputRef.current.value = '';
         return;
     }
 
     setIsUploading(true);
-    setIsAnnotating(true); // Keep annotation mode active
 
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
         
-        // Calculate image position and size
         const playerWidth = playerRef.current?.clientWidth || 0;
         const playerHeight = playerRef.current?.clientHeight || 0;
         
-        const imageWidth = 200; // Default width
+        const imageWidth = 200;
         const tempImage = new Image();
         tempImage.src = URL.createObjectURL(file);
         await new Promise(resolve => tempImage.onload = resolve);
@@ -161,7 +153,8 @@ export default function VideoPage() {
         const imageHeight = imageWidth / aspectRatio;
         URL.revokeObjectURL(tempImage.src);
 
-        const newAnnotation: Omit<Annotation, 'id'> = {
+        const newAnnotation: Annotation = {
+            id: `new-${Date.now()}`,
             type: 'image',
             data: {
                 url: imageUrl,
@@ -176,66 +169,51 @@ export default function VideoPage() {
             timecode: Math.floor(currentTime),
         };
         
-        // Save annotation immediately
-        addAnnotationsToVersion(firestore!, video.id, selectedVersionId, [newAnnotation]);
-
+        setNewAnnotations(prev => [...prev, newAnnotation]);
         toast({ title: '圖片已新增', description: '您現在可以拖曳、縮放或旋轉圖片。' });
+        setAnnotationMode('select');
 
     } catch (error) {
         toast({ variant: 'destructive', title: '圖片上傳失敗', description: '無法上傳註解圖片。' });
         console.error(error);
     } finally {
         setIsUploading(false);
-        // Do not exit annotation mode, allow user to edit immediately
-        // Reset file input to allow selecting the same file again
         if (imageAnnotationInputRef.current) {
           imageAnnotationInputRef.current.value = '';
         }
-        setAnnotationMode('select'); // Switch to select mode to allow interaction
     }
   };
 
-  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData) => {
+  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => {
     if (!user) return;
 
-    let newAnnotation: Omit<Annotation, 'id'> | null = null;
     const commonData = {
       author: { id: user.id, name: user.name },
       createdAt: new Date().toISOString(),
       timecode: Math.floor(currentTime),
     };
-
-    if (annotationMode === 'pen' && 'path' in data) {
-      newAnnotation = {
-        type: 'pen',
-        data,
-        ...commonData,
-      };
-    } else if (annotationMode === 'text' && 'text' in data) {
-        newAnnotation = {
-            type: 'text',
-            data,
-            ...commonData,
-        };
-        setAnnotationMode('select');
-    }
     
-    if (newAnnotation) {
-      setNewAnnotations(prev => [...prev, { ...newAnnotation, id: `new-${Date.now()}` } as Annotation]);
+    const newAnnotation: Annotation = {
+        id: `new-${Date.now()}`,
+        type: type,
+        data: data,
+        ...commonData,
+    };
+    
+    setNewAnnotations(prev => [...prev, newAnnotation]);
+    
+    if(type === 'text') {
+        setAnnotationMode('select');
     }
   };
 
   const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {
-    // Check if it's a new, unsaved annotation
     if (updatedAnnotation.id.startsWith('new-')) {
         setNewAnnotations(prev => prev.map(a => a.id === updatedAnnotation.id ? updatedAnnotation : a));
     } else {
-        // It's an existing annotation, update in Firestore and local state
         if (!firestore || !video || !selectedVersionId) return;
-
         updateAnnotationInVersion(firestore, video.id, selectedVersionId, updatedAnnotation);
         
-        // Optimistically update local state for immediate feedback
         if (setVideo) {
             const updatedVideo = { ...video };
             const versionIndex = updatedVideo.versions.findIndex(v => v.id === selectedVersionId);
