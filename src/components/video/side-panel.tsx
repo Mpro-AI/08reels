@@ -6,7 +6,6 @@ import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import AiSuggestionSection from './ai-suggestion-section';
 import { Video, Version, VersionStatus } from '@/lib/types';
-import { useAuth as useAppAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
   video: Video;
@@ -19,7 +18,6 @@ interface SidePanelProps {
 }
 
 export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment, onVersionStatusChange }: SidePanelProps) {
-  const { user } = useAppAuth();
   const [commentInput, setCommentInput] = useState('');
 
   const handleSuggestionToComment = (content: string) => {
@@ -38,7 +36,7 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
             <GitBranch className="mr-1.5 h-4 w-4" />
             版本
           </TabsTrigger>
-          <TabsTrigger value="ai" disabled={user?.role !== 'admin'}>
+          <TabsTrigger value="ai">
             <Wand2 className="mr-1.5 h-4 w-4" />
             AI 建議
           </TabsTrigger>
@@ -64,15 +62,13 @@ export default function SidePanel({ video, selectedVersion, onVersionChange, onT
                 />
             </TabsContent>
             <TabsContent value="ai" className="m-0">
-                {user?.role === 'admin' && (
-                  <AiSuggestionSection 
-                    video={video}
-                    selectedVersion={selectedVersion}
-                    onSuggestionClick={onTimecodeClick}
-                    onAddComment={onAddComment}
-                    onEditSuggestion={handleSuggestionToComment}
-                  />
-                )}
+              <AiSuggestionSection 
+                video={video}
+                selectedVersion={selectedVersion}
+                onSuggestionClick={onTimecodeClick}
+                onAddComment={onAddComment}
+                onEditSuggestion={handleSuggestionToComment}
+              />
             </TabsContent>
         </div>
       </Tabs>

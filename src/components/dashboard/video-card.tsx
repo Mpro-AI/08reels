@@ -45,7 +45,7 @@ export default function VideoCard({ video }: { video: Video }) {
          </div>
          <div className="flex items-center gap-2">
             <User className="size-4"/>
-            <span>指派給：{video.assignedTo.name}</span>
+            <span>作者：{video.author.name}</span>
          </div>
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground">

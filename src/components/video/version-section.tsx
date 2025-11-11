@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Version, VersionStatus, Video } from '@/lib/types';
 import { GitBranch, Check, X, Edit, Upload, Star, StickyNote } from 'lucide-react';
-import { useAuth as useAppAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -77,8 +77,9 @@ const StatusButton = ({
 
 
 export default function VersionSection({ video, versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
-    const { user } = useAppAuth();
+    const { user } = useAuth();
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const isOwner = user?.id === video.author.id;
 
   return (
     <Card className="border-0 shadow-none">
@@ -86,18 +87,20 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
         <CardTitle className="text-base">版本控制</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <UploadVideoDialog 
-            isOpen={isUploadOpen} 
-            onOpenChange={setIsUploadOpen}
-            video={video}
-        >
-            <DialogTrigger asChild>
-                <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
-                    <Upload className="mr-2 h-4 w-4"/>
-                    提交新版本
-                </Button>
-            </DialogTrigger>
-        </UploadVideoDialog>
+        {isOwner && (
+            <UploadVideoDialog 
+                isOpen={isUploadOpen} 
+                onOpenChange={setIsUploadOpen}
+                video={video}
+            >
+                <DialogTrigger asChild>
+                    <Button className="w-full" onClick={() => setIsUploadOpen(true)}>
+                        <Upload className="mr-2 h-4 w-4"/>
+                        提交新版本
+                    </Button>
+                </DialogTrigger>
+            </UploadVideoDialog>
+        )}
 
         <div className="space-y-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
             {versions.sort((a,b) => b.versionNumber - a.versionNumber).map(version => {
@@ -137,7 +140,7 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
                                 <p className="whitespace-pre-wrap">{version.notes}</p>
                             </div>
                         )}
-                        {user?.role === 'admin' && version.status === 'pending_review' && (
+                        {isOwner && version.status === 'pending_review' && (
                             <div className="grid grid-cols-3 gap-2 pt-2">
                                 <StatusButton
                                   versionId={version.id}

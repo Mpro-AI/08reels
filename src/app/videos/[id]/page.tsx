@@ -7,7 +7,7 @@ import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Video, Version, Comment, VersionStatus } from '@/lib/types';
-import { useAuth as useAppAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -26,7 +26,7 @@ export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
   const firestore = useFirestore();
-  const { user } = useAppAuth();
+  const { user } = useAuth();
   
   const videoRef = useMemo(() => {
     if (!firestore || !videoId) return null;
@@ -77,14 +77,23 @@ export default function VideoPage() {
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
-    if (!firestore || !video) return;
+    if (!firestore || !video || !user) return;
+    
+    if (video.author.id !== user.id) {
+        toast({
+            variant: 'destructive',
+            title: '權限不足',
+            description: '只有影片的作者才能變更版本狀態。'
+        });
+        return;
+    }
 
     setVersionStatus(firestore, video.id, versionId, status);
     
     toast({
       title: '版本狀態已更新',
     });
-  }, [firestore, video, toast]);
+  }, [firestore, video, user, toast]);
 
 
   useEffect(() => {
