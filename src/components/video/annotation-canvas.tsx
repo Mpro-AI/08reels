@@ -244,7 +244,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     const coords = getCoords(e);
-    if (!coords) return;
+    if (!coords || !isAnnotating) return;
     setStartPoint(coords);
     
     if (annotationMode === 'pen') {

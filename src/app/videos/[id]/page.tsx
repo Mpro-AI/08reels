@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion, addAnnotationsToVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
+import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion, addCommentToVersion } from '@/firebase/firestore/videos';
 import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import { Button } from '@/components/ui/button';
@@ -89,7 +89,7 @@ export default function VideoPage() {
       author: user,
     };
     
-    addCommentToVersion(firestore, video.id, selectedVersionId, newComment, user);
+    addCommentToVersion(firestore, video.id, selectedVersionId, newComment);
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
@@ -140,6 +140,7 @@ export default function VideoPage() {
     const file = e.target.files?.[0];
     if (file) {
       setImageAnnotationFile(file);
+      setAnnotationMode('image');
       toast({ title: '圖片已選取', description: '請在影片畫面上點擊以放置圖片。' });
     } else {
       // No file selected, revert to select mode
