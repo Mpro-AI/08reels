@@ -1,5 +1,5 @@
 'use client';
-import { MessageSquare, Plus, PenLine, Trash2, ImageUp } from 'lucide-react';
+import { MessageSquare, Plus, PenLine, Trash2, ImageUp, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -106,6 +106,9 @@ export default function CommentSection({
                 )}>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'pen')}>
                         <PenLine className="h-3.5 w-3.5"/>
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'text')}>
+                        <Type className="h-3.5 w-3.5"/>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAnnotationClick(comment.timecode, 'image')}>
                         <ImageUp className="h-3.5 w-3.5"/>

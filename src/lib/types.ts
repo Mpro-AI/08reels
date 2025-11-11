@@ -30,10 +30,21 @@ export type ImageAnnotationData = {
   rotation: number; // in radians
 };
 
+export type TextAnnotationData = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  color: string;
+  rotation: number; // in radians
+};
+
 export type Annotation = {
     id: string;
-    type: 'pen' | 'image';
-    data: PenAnnotationData | ImageAnnotationData;
+    type: 'pen' | 'image' | 'text';
+    data: PenAnnotationData | ImageAnnotationData | TextAnnotationData;
     author: Pick<User, 'id' | 'name'>;
     createdAt: string;
     timecode: number;

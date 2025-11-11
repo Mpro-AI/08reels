@@ -5,12 +5,12 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
-import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
+import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion, addCommentToVersion } from '@/firebase/firestore/videos';
 import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
@@ -23,7 +23,7 @@ function formatTime(seconds: number): string {
   return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
 
-export type AnnotationMode = 'pen' | 'select' | 'image';
+export type AnnotationMode = 'pen' | 'select' | 'image' | 'text';
 
 export default function VideoPage() {
   const params = useParams();
@@ -77,15 +77,17 @@ export default function VideoPage() {
   const handleAddComment = useCallback((commentText: string) => {
     if (!firestore || !video || !user || !selectedVersionId) return;
     
-    // This is a placeholder for the actual addCommentToVersion function
-    // For now, we just log it.
-    console.log('Adding comment:', {
-      videoId: video.id,
-      versionId: selectedVersionId,
-      commentText,
-      timecode: Math.floor(currentTime),
-      user: user.name,
-    });
+    addCommentToVersion(
+      firestore,
+      video.id,
+      selectedVersionId,
+      {
+        text: commentText,
+        timecode: Math.floor(currentTime),
+        timecodeFormatted: formatTime(currentTime),
+      },
+      user,
+    );
 
   }, [firestore, video, user, currentTime, selectedVersionId]);
 
@@ -194,7 +196,7 @@ export default function VideoPage() {
     }
   };
 
-  const handleAddAnnotation = (data: PenAnnotationData, type: 'pen') => {
+  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => {
     if (!user) return;
 
     const commonData = {
@@ -211,6 +213,9 @@ export default function VideoPage() {
     };
     
     setNewAnnotations(prev => [...prev, newAnnotation]);
+    if (type === 'text') {
+      setAnnotationMode('select'); // Switch to select mode to allow interaction
+    }
   };
 
   const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {
@@ -248,6 +253,10 @@ export default function VideoPage() {
   };
   
   const exitAnnotationMode = () => {
+    if (newAnnotations.length > 0) {
+      const confirmExit = confirm('您有尚未儲存的註解，確定要捨棄嗎？');
+      if (!confirmExit) return;
+    }
     setNewAnnotations([]);
     setIsAnnotating(false);
     setAnnotationMode('select');

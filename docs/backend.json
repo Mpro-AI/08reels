@@ -58,7 +58,7 @@
         },
         "type": {
           "type": "string",
-          "enum": ["pen", "image"]
+          "enum": ["pen", "image", "text"]
         },
         "data": {
           "type": "object"

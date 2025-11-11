@@ -1,6 +1,6 @@
 'use client';
 
-import { Pen, MousePointer2, Save, X, Loader2 } from 'lucide-react';
+import { Pen, MousePointer2, Save, X, Loader2, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -37,7 +37,7 @@ export default function AnnotationToolbar({
 }: AnnotationToolbarProps) {
   return (
     <div className="bg-card/80 backdrop-blur-sm border rounded-lg p-2 flex items-center gap-2 shadow-lg">
-      <ToggleGroup type="single" value={mode} onValueChange={(value) => onModeChange(value as AnnotationMode)}>
+      <ToggleGroup type="single" value={mode} onValueChange={(value) => value && onModeChange(value as AnnotationMode)}>
         <ToggleGroupItem value="select" aria-label="Select element">
           <MousePointer2 className="h-4 w-4" />
         </ToggleGroupItem>
@@ -46,7 +46,7 @@ export default function AnnotationToolbar({
         </ToggleGroupItem>
       </ToggleGroup>
       
-      {mode === 'pen' && (
+      {(mode === 'pen' || mode === 'text') && (
         <>
           <Separator orientation="vertical" className="h-6" />
           <div className="flex items-center gap-1">
