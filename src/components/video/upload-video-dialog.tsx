@@ -182,7 +182,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mockUsers.map(u => (
+                            {mockUsers.filter(u => u.role !== 'admin').map(u => (
                               <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                             ))}
                           </SelectContent>
