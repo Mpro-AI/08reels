@@ -22,7 +22,7 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <VideoGrid videos={videos || []} />
+            <VideoGrid videos={videos ?? []} />
           )}
         </main>
       </div>
