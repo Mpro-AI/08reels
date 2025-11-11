@@ -295,7 +295,7 @@ export default function VideoPage() {
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
                     <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating} />
-                    {isAnnotating && (
+                    {isAnnotating && (annotationMode === 'pen' || annotationMode === 'select') && (
                       <div className="absolute top-4 z-20 flex w-full justify-center">
                          <AnnotationToolbar
                             mode={annotationMode}
