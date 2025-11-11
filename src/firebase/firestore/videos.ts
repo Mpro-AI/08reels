@@ -120,7 +120,7 @@ export function setVersionStatus(
 export async function addVersionToVideo(
     db: Firestore,
     videoId: string,
-    videoDataUri: string,
+    videoUrl: string,
     uploader: Pick<User, 'id' | 'name'>
   ) {
     const videoRef = doc(db, 'videos', videoId);
@@ -143,7 +143,7 @@ export async function addVersionToVideo(
           comments: [],
           annotations: [],
           isCurrentActive: false,
-          videoUrl: videoDataUri,
+          videoUrl: videoUrl,
         };
   
         const newVersions = [...video.versions, newVersion];
@@ -166,7 +166,7 @@ export async function addVersionToVideo(
 
 export async function addVideo(
     db: Firestore,
-    newVideoData: { title: string; videoDataUri: string, assignedTo: Pick<User, 'id' | 'name'> },
+    newVideoData: { title: string; videoUrl: string, assignedTo: Pick<User, 'id' | 'name'> },
     uploader: Pick<User, 'id' | 'name'>
 ) {
     const videoRef = doc(collection(db, 'videos'));
@@ -180,7 +180,7 @@ export async function addVideo(
             comments: [],
             annotations: [],
             isCurrentActive: true,
-            videoUrl: newVideoData.videoDataUri,
+            videoUrl: newVideoData.videoUrl,
         };
         
         // Get a random placeholder image
@@ -193,7 +193,7 @@ export async function addVideo(
             assignedTo: newVideoData.assignedTo,
             uploadedAt: Timestamp.now().toDate().toISOString(),
             versions: [firstVersion],
-            videoUrl: newVideoData.videoDataUri,
+            videoUrl: newVideoData.videoUrl,
         };
 
         await setDoc(videoRef, newVideo);

@@ -20,10 +20,22 @@ import { Video } from '@/lib/types';
 import { addVersionToVideo, addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
+import { uploadVideoAndGetUrl } from '@/firebase/storage';
+import { useStorage } from '@/firebase';
+import { Progress } from '@/components/ui/progress';
+
+const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo"];
 
 const formSchema = z.object({
   title: z.string().optional(),
-  videoFile: z.instanceof(FileList).refine(files => files.length > 0, '請選擇一個影片檔案'),
+  videoFile: z.instanceof(FileList)
+    .refine(files => files?.length > 0, '請選擇一個影片檔案')
+    .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `檔案大小不能超過 1GB。`)
+    .refine(
+      files => ACCEPTED_VIDEO_TYPES.includes(files?.[0]?.type),
+      "不支援的檔案格式，僅支援 MP4 / MOV / AVI。"
+    ),
 });
 
 type UploadVideoForm = z.infer<typeof formSchema>;
@@ -37,9 +49,11 @@ interface UploadVideoDialogProps {
 
 export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: UploadVideoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const firestore = useFirestore();
+  const storage = useStorage();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<UploadVideoForm>({
     resolver: zodResolver(formSchema),
@@ -48,21 +62,13 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
   const handleClose = () => {
     if (isSubmitting) return;
     reset();
+    setUploadProgress(0);
     onOpenChange(false);
   };
-  
-  const getFileDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-  }
 
   const onSubmit = async (data: UploadVideoForm) => {
-    if (!user || !firestore) {
-      toast({ variant: 'destructive', title: '錯誤', description: '使用者未登入或資料庫連線失敗' });
+    if (!user || !firestore || !storage) {
+      toast({ variant: 'destructive', title: '錯誤', description: '使用者未登入或服務連線失敗' });
       return;
     }
     
@@ -70,11 +76,17 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
     
     try {
         const videoFile = data.videoFile[0];
-        const videoDataUri = await getFileDataUri(videoFile);
+
+        const videoUrl = await uploadVideoAndGetUrl(
+          storage, 
+          videoFile, 
+          setUploadProgress,
+          video?.id
+        );
 
         if (video) {
             // Add new version to existing video
-            await addVersionToVideo(firestore, video.id, videoDataUri, { id: user.id, name: user.name });
+            await addVersionToVideo(firestore, video.id, videoUrl, { id: user.id, name: user.name });
             toast({ title: '成功', description: '新版本已成功提交。' });
         } else {
             // Create a new video project
@@ -83,10 +95,9 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                 setIsSubmitting(false);
                 return;
             }
-            // For a new video, we need a placeholder thumbnail. Let's just use a static one for now.
             const newVideoData = {
                 title: data.title,
-                videoDataUri: videoDataUri,
+                videoUrl: videoUrl,
                 assignedTo: { id: user.id, name: user.name }, // Or some other logic for assignment
             };
             await addVideo(firestore, newVideoData, { id: user.id, name: user.name });
@@ -99,8 +110,11 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
         toast({ variant: 'destructive', title: '上傳失敗', description: '處理您的請求時發生錯誤。' });
     } finally {
         setIsSubmitting(false);
+        setUploadProgress(0);
     }
   };
+  
+  const isUploading = isSubmitting && uploadProgress > 0 && uploadProgress < 100;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -111,6 +125,8 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
             <DialogTitle>{video ? `提交新版本至 "${video.title}"` : '上傳新專案影片'}</DialogTitle>
             <DialogDescription>
               {video ? '請選擇要上傳的新版本影片檔案。' : '請提供影片標題並選擇影片檔案來建立一個新的專案。'}
+              <br/>
+              <span className="text-xs text-muted-foreground">僅支援 MP4 / MOV / AVI，單檔上限：1GB。</span>
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -120,7 +136,7 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                   標題
                 </Label>
                 <div className="col-span-3">
-                  <Input id="title" {...register('title')} className="w-full" />
+                  <Input id="title" {...register('title')} className="w-full" disabled={isSubmitting}/>
                   {errors.title && <p className="text-destructive text-sm mt-1">{errors.title.message}</p>}
                 </div>
               </div>
@@ -130,15 +146,21 @@ export function UploadVideoDialog({ video, children, isOpen, onOpenChange }: Upl
                 影片檔案
               </Label>
               <div className="col-span-3">
-                <Input id="video-file" type="file" accept="video/*" {...register('videoFile')} />
-                {errors.videoFile && <p className="text-destructive text-sm mt-1">{errors.videoFile.message}</p>}
+                <Input id="video-file" type="file" accept="video/mp4,video/quicktime,video/x-msvideo" {...register('videoFile')} disabled={isSubmitting}/>
+                {errors.videoFile && <p className="text-destructive text-sm mt-1">{errors.videoFile.message?.toString()}</p>}
               </div>
             </div>
+            {isSubmitting && (
+                <div className="col-span-4 space-y-2">
+                    <Label>{isUploading ? `上傳中... ${uploadProgress.toFixed(0)}%` : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')}</Label>
+                    <Progress value={uploadProgress} />
+                </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 處理中...</> : '提交'}
+              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
             </Button>
           </DialogFooter>
         </form>
