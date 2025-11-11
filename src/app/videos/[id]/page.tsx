@@ -5,8 +5,10 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
-import { videos } from '@/lib/mock-data';
+import { videos as initialVideos } from '@/lib/mock-data';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Video, Version, Comment } from '@/lib/types';
+import { useAuth } from '@/hooks/use-auth';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -20,10 +22,17 @@ function formatTime(seconds: number): string {
 export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
-  const video = videos.find(v => v.id === videoId);
+  
+  const [videos, setVideos] = useState(initialVideos);
+  const [video, setVideo] = useState<Video | undefined>(videos.find(v => v.id === videoId));
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    setVideo(videos.find(v => v.id === videoId));
+  }, [videoId, videos]);
 
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (videoRef.current) {
@@ -31,6 +40,44 @@ export default function VideoPage() {
       videoRef.current.play();
     }
   }, []);
+
+  const handleAddComment = useCallback((commentText: string) => {
+    if (!video || !user) return;
+
+    const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
+    if (!currentVersion) return;
+
+    const newComment: Comment = {
+      id: `comment-${Date.now()}`,
+      timecode: Math.floor(currentTime),
+      timecodeFormatted: formatTime(currentTime),
+      text: commentText,
+      author: { id: user.id, name: user.name },
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedVideos = videos.map(v => {
+      if (v.id === video.id) {
+        return {
+          ...v,
+          versions: v.versions.map(ver => {
+            if (ver.id === currentVersion.id) {
+              return {
+                ...ver,
+                comments: [...ver.comments, newComment],
+              };
+            }
+            return ver;
+          }),
+        };
+      }
+      return v;
+    });
+
+    setVideos(updatedVideos);
+
+  }, [video, user, currentTime, videos]);
+
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -73,6 +120,7 @@ export default function VideoPage() {
                         video={video} 
                         onTimecodeClick={handleTimecodeClick} 
                         currentTimeFormatted={formatTime(currentTime)}
+                        onAddComment={handleAddComment}
                     />
                 </div>
             </main>

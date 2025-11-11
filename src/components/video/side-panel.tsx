@@ -11,9 +11,10 @@ interface SidePanelProps {
   video: Video;
   onTimecodeClick: (timecode: number) => void;
   currentTimeFormatted: string;
+  onAddComment: (commentText: string) => void;
 }
 
-export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted }: SidePanelProps) {
+export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted, onAddComment }: SidePanelProps) {
   const { user } = useAuth();
   const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
 
@@ -36,7 +37,12 @@ export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted
         </TabsList>
         <div className="flex-1 overflow-y-auto">
             <TabsContent value="comments" className="m-0">
-                <CommentSection comments={currentVersion.comments} onCommentClick={onTimecodeClick} currentTimeFormatted={currentTimeFormatted} />
+                <CommentSection 
+                    comments={currentVersion.comments} 
+                    onCommentClick={onTimecodeClick} 
+                    currentTimeFormatted={currentTimeFormatted}
+                    onAddComment={onAddComment}
+                />
             </TabsContent>
             <TabsContent value="versions" className="m-0">
                 <VersionSection versions={video.versions} />

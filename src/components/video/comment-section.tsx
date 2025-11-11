@@ -1,9 +1,10 @@
 'use client';
+import { useState } from 'react';
 import { MessageSquare, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Comment, User } from '@/lib/types';
+import { Comment } from '@/lib/types';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -11,10 +12,20 @@ interface CommentSectionProps {
   comments: Comment[];
   onCommentClick: (timecode: number) => void;
   currentTimeFormatted: string;
+  onAddComment: (commentText: string) => void;
 }
 
-export default function CommentSection({ comments, onCommentClick, currentTimeFormatted }: CommentSectionProps) {
+export default function CommentSection({ comments, onCommentClick, currentTimeFormatted, onAddComment }: CommentSectionProps) {
   const { user } = useAuth();
+  const [commentText, setCommentText] = useState('');
+
+  const handleAddComment = () => {
+    if (commentText.trim() && user) {
+      onAddComment(commentText);
+      setCommentText('');
+    }
+  };
+
   return (
     <Card className="border-0 shadow-none">
       <CardHeader>
@@ -25,8 +36,13 @@ export default function CommentSection({ comments, onCommentClick, currentTimeFo
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Textarea placeholder="在目前時間點新增評論..." className="mb-2" />
-          <Button className="w-full">
+          <Textarea 
+            placeholder="在目前時間點新增評論..." 
+            className="mb-2" 
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+          />
+          <Button className="w-full" onClick={handleAddComment} disabled={!commentText.trim()}>
             <Plus className="mr-2 h-4 w-4" />
             新增評論
           </Button>
