@@ -54,6 +54,7 @@ service cloud.firestore {
     
     // Validates a single Version object
     function isValidVersion(version) {
+        // The 'notes' field is optional, so we don't validate its presence.
         return version.keys().hasAll(['id', 'versionNumber', 'status', 'createdAt', 'uploader', 'comments', 'annotations', 'isCurrentActive', 'videoUrl']) &&
                version.id is string &&
                version.versionNumber is number &&
@@ -62,7 +63,7 @@ service cloud.firestore {
                isValidUserReference(version.uploader) &&
                version.videoUrl is string &&
                // All items in the comments list must be valid comments
-               (version.comments is list && version.comments.size() == 0 || version.comments.size() > 0 && version.comments.all(c, isValidComment(c)));
+               (version.comments is list && (version.comments.size() == 0 || version.comments.all(c, isValidComment(c))));
     }
     
     // Validates the entire Video document data for consistency and correctness.
@@ -76,10 +77,7 @@ service cloud.firestore {
                videoData.videoUrl is string &&
                videoData.versions is list && videoData.versions.size() > 0 &&
                // All items in the versions list must be valid versions
-               videoData.versions.all(v, isValidVersion(v)) &&
-               // There must be exactly one version marked as the active one, which must match the top-level videoUrl.
-               videoData.versions.filter(v, v.isCurrentActive == true).size() == 1 &&
-               videoData.versions.filter(v, v.isCurrentActive == true)[0].videoUrl == videoData.videoUrl;
+               videoData.versions.all(v, isValidVersion(v));
     }
 
     // =================================
@@ -114,8 +112,6 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                        // The author of the video cannot be changed.
                        resource.data.author.id == request.resource.data.author.id &&
-                       // The video title cannot be changed.
-                       resource.data.title == request.resource.data.title &&
                        // The entire updated document data must be valid.
                        isValidVideoData(request.resource.data) &&
                        // The person making the change must be the owner (author/admin) or the person it's assigned to.
