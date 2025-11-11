@@ -41,16 +41,18 @@ export default function VideoPage() {
     }
   }, []);
 
-  const handleAddComment = useCallback((commentText: string) => {
+  const handleAddComment = useCallback((commentText: string, timecode?: number) => {
     if (!video || !user) return;
 
     const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
     if (!currentVersion) return;
+    
+    const commentTime = timecode !== undefined ? timecode : currentTime;
 
     const newComment: Comment = {
       id: `comment-${Date.now()}`,
-      timecode: Math.floor(currentTime),
-      timecodeFormatted: formatTime(currentTime),
+      timecode: Math.floor(commentTime),
+      timecodeFormatted: formatTime(commentTime),
       text: commentText,
       author: { id: user.id, name: user.name },
       createdAt: new Date().toISOString(),

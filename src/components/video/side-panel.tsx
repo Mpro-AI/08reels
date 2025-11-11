@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, GitBranch, Wand2 } from 'lucide-react';
 import CommentSection from './comment-section';
@@ -11,12 +12,17 @@ interface SidePanelProps {
   video: Video;
   onTimecodeClick: (timecode: number) => void;
   currentTimeFormatted: string;
-  onAddComment: (commentText: string) => void;
+  onAddComment: (commentText: string, timecode?: number) => void;
 }
 
 export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted, onAddComment }: SidePanelProps) {
   const { user } = useAuth();
   const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
+  const [commentInput, setCommentInput] = useState('');
+
+  const handleSuggestionToComment = (content: string) => {
+    setCommentInput(content);
+  };
 
   return (
     <div className="h-full bg-card border-l flex flex-col">
@@ -42,13 +48,22 @@ export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted
                     onCommentClick={onTimecodeClick} 
                     currentTimeFormatted={currentTimeFormatted}
                     onAddComment={onAddComment}
+                    inputValue={commentInput}
+                    onInputValueChange={setCommentInput}
                 />
             </TabsContent>
             <TabsContent value="versions" className="m-0">
                 <VersionSection versions={video.versions} />
             </TabsContent>
             <TabsContent value="ai" className="m-0">
-                {user?.role === 'admin' && <AiSuggestionSection video={video} onSuggestionClick={onTimecodeClick}/>}
+                {user?.role === 'admin' && (
+                  <AiSuggestionSection 
+                    video={video} 
+                    onSuggestionClick={onTimecodeClick}
+                    onAddComment={onAddComment}
+                    onEditComment={handleSuggestionToComment}
+                  />
+                )}
             </TabsContent>
         </div>
       </Tabs>

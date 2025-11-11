@@ -11,11 +11,15 @@ import { Skeleton } from '../ui/skeleton';
 interface AiSuggestionSectionProps {
   video: Video;
   onSuggestionClick: (timecode: number) => void;
+  onAddComment: (commentText: string, timecode: number) => void;
+  onEditComment: (commentText: string) => void;
 }
 
-export default function AiSuggestionSection({ video, onSuggestionClick }: AiSuggestionSectionProps) {
+type Suggestion = SuggestAnnotationsWithAIOutput['suggestions'][0] & { id: number };
+
+export default function AiSuggestionSection({ video, onSuggestionClick, onAddComment, onEditComment }: AiSuggestionSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<SuggestAnnotationsWithAIOutput['suggestions'] | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const { toast } = useToast();
 
   const handleGetSuggestions = async () => {
@@ -32,7 +36,7 @@ export default function AiSuggestionSection({ video, onSuggestionClick }: AiSugg
     setSuggestions(null);
     try {
       const result = await suggestAnnotationsWithAI({ videoDataUri: video.videoDataUri });
-      setSuggestions(result.suggestions);
+      setSuggestions(result.suggestions.map((s, i) => ({...s, id: i})));
     } catch (error) {
       console.error('AI suggestion error:', error);
       toast({
@@ -52,6 +56,25 @@ export default function AiSuggestionSection({ video, onSuggestionClick }: AiSugg
     }
     return 0;
   }
+
+  const handleAccept = (suggestion: Suggestion) => {
+    onAddComment(suggestion.content, parseTimecode(suggestion.timecode));
+    setSuggestions(current => current?.filter(s => s.id !== suggestion.id) || null);
+    toast({
+        title: '已接受建議',
+        description: 'AI 建議已新增至評論列表。'
+    })
+  };
+
+  const handleEdit = (suggestion: Suggestion) => {
+    onEditComment(suggestion.content);
+    setSuggestions(current => current?.filter(s => s.id !== suggestion.id) || null);
+  };
+  
+  const handleReject = (suggestionId: number) => {
+    setSuggestions(current => current?.filter(s => s.id !== suggestionId) || null);
+  };
+
 
   return (
     <Card className="border-0 shadow-none">
@@ -73,8 +96,8 @@ export default function AiSuggestionSection({ video, onSuggestionClick }: AiSugg
           {suggestions && suggestions.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-4">AI 未找到可建議的註解。</p>
           )}
-          {suggestions && suggestions.map((suggestion, index) => (
-            <div key={index} className="rounded-lg border bg-card p-3 space-y-2 text-sm">
+          {suggestions && suggestions.map((suggestion) => (
+            <div key={suggestion.id} className="rounded-lg border bg-card p-3 space-y-2 text-sm">
               <button 
                 onClick={() => onSuggestionClick(parseTimecode(suggestion.timecode))}
                 className="font-mono text-primary hover:underline cursor-pointer"
@@ -83,13 +106,13 @@ export default function AiSuggestionSection({ video, onSuggestionClick }: AiSugg
               </button>
               <p className="text-foreground">{suggestion.content}</p>
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleReject(suggestion.id)}>
                   <X className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleEdit(suggestion)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent-foreground">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent-foreground" onClick={() => handleAccept(suggestion)}>
                   <Check className="h-4 w-4" />
                 </Button>
               </div>
