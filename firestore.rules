@@ -26,7 +26,8 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.author.id == request.auth.uid
                     && request.resource.data.title is string
-                    && request.resource.data.thumbnailUrl is string;
+                    && request.resource.data.thumbnailUrl is string
+                    && 'uploadedAt' in request.resource.data;
 
       allow update: if isSignedIn() && request.auth.uid == resource.data.author.id;
       
