@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { User, UserRole } from '@/lib/types';
-import { useCollection, useFirestore } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { doc } from 'firebase/firestore';
 
@@ -50,19 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [firestore]);
 
 
-  const usersQuery = useMemo(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'users');
-  }, [firestore]);
-
-  const { data: users, loading: usersLoading } = useCollection<User>(usersQuery);
-
   const login = useCallback(async (pin: string): Promise<boolean> => {
-    if (usersLoading || !firestore) {
+    if (!firestore) {
         toast({
             variant: "destructive",
             title: "登入錯誤",
-            description: "使用者資料尚未載入，請稍後再試。",
+            description: "資料庫連線失敗，請稍後再試。",
         });
         return false;
     }
@@ -80,9 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const matchedUser = querySnapshot.docs[0].data() as User;
-      matchedUser.id = querySnapshot.docs[0].id;
-      setUser(matchedUser);
+      const matchedUser = querySnapshot.docs[0].data() as Omit<User, 'id'>;
+      const userWithId: User = {
+        id: querySnapshot.docs[0].id,
+        ...matchedUser
+      };
+      
+      setUser(userWithId);
       return true;
 
     } catch (error) {
@@ -95,20 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-  }, [toast, firestore, usersLoading]);
+  }, [toast, firestore]);
 
   const logout = useCallback(() => {
     setUser(null);
   }, []);
   
   const setUserRole = useCallback((role: UserRole) => {
-    if (users) {
-        const newUser = users.find(u => u.role === role);
-        if(newUser) {
-          setUser(newUser);
-        }
-    }
-  }, [users]);
+    // This is a mock function for now. In a real app, you'd fetch the user by role.
+    console.log("Switching to user with role:", role);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ isAuthenticated: !!user, user, login, logout, setUserRole }}>
