@@ -46,10 +46,10 @@ export function LoginForm() {
               type="password"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
-              placeholder="••••••"
+              placeholder="••••"
               required
               minLength={4}
-              maxLength={6}
+              maxLength={4}
               disabled={isLoading}
               className="text-center text-lg tracking-[0.5em]"
             />
