@@ -22,7 +22,7 @@ export default function Header({ title }: HeaderProps) {
           onOpenChange={setIsUploadOpen}
         >
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => setIsUploadOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               上傳影片
             </Button>
