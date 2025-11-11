@@ -26,12 +26,22 @@ export default function VideoPage() {
   const [videos, setVideos] = useState(initialVideos);
   const [video, setVideo] = useState<Video | undefined>(videos.find(v => v.id === videoId));
 
+  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(
+    video?.versions.find(v => v.isCurrentActive)?.id || video?.versions[0]?.id
+  );
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const { user } = useAuth();
+  
+  const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
   useEffect(() => {
-    setVideo(videos.find(v => v.id === videoId));
+    const currentVideo = videos.find(v => v.id === videoId);
+    setVideo(currentVideo);
+    if (currentVideo) {
+      setSelectedVersionId(currentVideo.versions.find(v => v.isCurrentActive)?.id || currentVideo.versions[0]?.id);
+    }
   }, [videoId, videos]);
 
   const handleTimecodeClick = useCallback((timecode: number) => {
@@ -42,10 +52,7 @@ export default function VideoPage() {
   }, []);
 
   const handleAddComment = useCallback((commentText: string, timecode?: number) => {
-    if (!video || !user) return;
-
-    const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
-    if (!currentVersion) return;
+    if (!video || !user || !selectedVersionId) return;
     
     const commentTime = timecode !== undefined ? timecode : currentTime;
 
@@ -63,7 +70,7 @@ export default function VideoPage() {
         return {
           ...v,
           versions: v.versions.map(ver => {
-            if (ver.id === currentVersion.id) {
+            if (ver.id === selectedVersionId) {
               return {
                 ...ver,
                 comments: [...ver.comments, newComment],
@@ -78,7 +85,7 @@ export default function VideoPage() {
 
     setVideos(updatedVideos);
 
-  }, [video, user, currentTime, videos]);
+  }, [video, user, currentTime, videos, selectedVersionId]);
 
 
   useEffect(() => {
@@ -90,7 +97,7 @@ export default function VideoPage() {
     return () => videoElement.removeEventListener('timeupdate', onTimeUpdate);
   }, []);
   
-  if (!video) {
+  if (!video || !selectedVersion) {
     return (
         <AppLayout>
             <div className="flex flex-1 flex-col">
@@ -119,7 +126,9 @@ export default function VideoPage() {
                 </div>
                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
                     <SidePanel 
-                        video={video} 
+                        video={video}
+                        selectedVersion={selectedVersion}
+                        onVersionChange={setSelectedVersionId}
                         onTimecodeClick={handleTimecodeClick} 
                         currentTimeFormatted={formatTime(currentTime)}
                         onAddComment={handleAddComment}

@@ -5,19 +5,20 @@ import { MessageSquare, GitBranch, Wand2 } from 'lucide-react';
 import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import AiSuggestionSection from './ai-suggestion-section';
-import { Video } from '@/lib/types';
+import { Video, Version } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
   video: Video;
+  selectedVersion: Version;
+  onVersionChange: (versionId: string) => void;
   onTimecodeClick: (timecode: number) => void;
   currentTimeFormatted: string;
   onAddComment: (commentText: string, timecode?: number) => void;
 }
 
-export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted, onAddComment }: SidePanelProps) {
+export default function SidePanel({ video, selectedVersion, onVersionChange, onTimecodeClick, currentTimeFormatted, onAddComment }: SidePanelProps) {
   const { user } = useAuth();
-  const currentVersion = video.versions.find(v => v.isCurrentActive) || video.versions[0];
   const [commentInput, setCommentInput] = useState('');
 
   const handleSuggestionToComment = (content: string) => {
@@ -44,7 +45,7 @@ export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted
         <div className="flex-1 overflow-y-auto">
             <TabsContent value="comments" className="m-0">
                 <CommentSection 
-                    comments={currentVersion.comments} 
+                    comments={selectedVersion.comments} 
                     onCommentClick={onTimecodeClick} 
                     currentTimeFormatted={currentTimeFormatted}
                     onAddComment={onAddComment}
@@ -53,7 +54,11 @@ export default function SidePanel({ video, onTimecodeClick, currentTimeFormatted
                 />
             </TabsContent>
             <TabsContent value="versions" className="m-0">
-                <VersionSection versions={video.versions} />
+                <VersionSection 
+                  versions={video.versions} 
+                  selectedVersionId={selectedVersion.id}
+                  onVersionChange={onVersionChange}
+                />
             </TabsContent>
             <TabsContent value="ai" className="m-0">
                 {user?.role === 'admin' && (
