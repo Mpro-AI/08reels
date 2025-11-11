@@ -2,10 +2,32 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      // Allow read and write access to everyone.
-      // This is insecure for production but will unblock development.
-      allow read, write: if true;
+    // Helper function to check if a user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Matches any video version file.
+    match /videos/{videoId}/versions/{versionId}/{fileName} {
+      // Allow anyone to read the video files.
+      // This is necessary for the video player to work and for AI analysis.
+      allow read: if true;
+
+      // Only signed-in users can upload new video versions.
+      allow write: if isSignedIn();
+
+      // Nobody can delete or overwrite a video file once it's uploaded to preserve version history.
+      allow delete: if false;
+      allow update: if false;
+    }
+
+    // Matches any annotation image file.
+    match /videos/{videoId}/versions/{versionId}/annotations/{imageName} {
+      // Anyone can read annotation images.
+      allow read: if true;
+
+      // Only signed-in users can upload annotation images.
+      allow write: if isSignedIn();
     }
   }
 }

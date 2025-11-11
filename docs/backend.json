@@ -112,6 +112,10 @@
         },
         "videoUrl": {
           "type": "string"
+        },
+        "notes": {
+            "type": "string",
+            "description": "Notes specific to this version."
         }
       },
       "required": ["id", "versionNumber", "status", "createdAt", "uploader", "comments", "annotations", "isCurrentActive"]
@@ -148,6 +152,10 @@
         },
         "videoUrl": {
           "type": "string"
+        },
+        "notes": {
+            "type": "string",
+            "description": "General notes about the video project."
         }
       },
       "required": ["id", "title", "thumbnailUrl", "author", "uploadedAt", "versions", "videoUrl"]

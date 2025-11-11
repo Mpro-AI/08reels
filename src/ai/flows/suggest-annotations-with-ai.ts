@@ -9,13 +9,14 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {getDownloadURL, ref, getStorage} from 'firebase/storage';
 import {z} from 'genkit';
 
 const SuggestAnnotationsWithAIInputSchema = z.object({
   videoUrl: z
     .string()
     .describe(
-      'The video data as a public URL or a data URI.'
+      'The Firebase Storage URL (gs://...) of the video to analyze.'
     ),
 });
 export type SuggestAnnotationsWithAIInput = z.infer<typeof SuggestAnnotationsWithAIInputSchema>;
@@ -30,6 +31,21 @@ const SuggestAnnotationsWithAIOutputSchema = z.object({
 });
 export type SuggestAnnotationsWithAIOutput = z.infer<typeof SuggestAnnotationsWithAIOutputSchema>;
 
+
+async function getPublicUrl(gsUrl: string) {
+  try {
+    const storage = getStorage();
+    const storageRef = ref(storage, gsUrl);
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    console.error("Error getting public URL from GS URL:", error);
+    // In case of error, we might want to return the original URL
+    // or handle it appropriately, maybe the flow should fail.
+    return gsUrl;
+  }
+}
+
+
 export async function suggestAnnotationsWithAI(input: SuggestAnnotationsWithAIInput): Promise<SuggestAnnotationsWithAIOutput> {
   return suggestAnnotationsWithAIFlow(input);
 }
@@ -43,9 +59,10 @@ const suggestAnnotationsPrompt = ai.definePrompt({
   For each suggestion, provide the timecode in HH:MM:SS format and a clear, concise comment on what could be improved.
   Focus on aspects like pacing, editing, shot composition, color grading, and audio.
 
-  Here is the video to analyze: {{media url=videoUrl}}
+  Here is the video to analyze: {{media url=(await getPublicUrl(videoUrl))}}
   
   Return the suggestions in the format specified by the SuggestAnnotationsWithAIOutputSchema. If no suggestions can be made, return an empty array.`,  
+  tools: [getPublicUrl]
 });
 
 const suggestAnnotationsWithAIFlow = ai.defineFlow(
