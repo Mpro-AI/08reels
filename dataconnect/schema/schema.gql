@@ -1,0 +1,57 @@
+type User @table {
+  firebaseUid: String!
+  role: String!
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  pinHash: String
+}
+
+type Video @table {
+  title: String!
+  originalFileName: String!
+  uploadDate: Timestamp!
+  currentVersionNumber: Int!
+  createdBy: User!
+  description: String
+}
+
+type VideoVersion @table {
+  video: Video!
+  versionNumber: Int!
+  fileUrl: String!
+  uploadedBy: User!
+  uploadDate: Timestamp!
+  status: String!
+  createdAt: Timestamp!
+  reviewNotes: String
+  approvalDate: Timestamp
+}
+
+type Comment @table {
+  videoVersion: VideoVersion!
+  timestampInSeconds: Int!
+  text: String!
+  commentedBy: User!
+  createdAt: Timestamp!
+  aiSuggested: Boolean
+}
+
+type Annotation @table {
+  videoVersion: VideoVersion!
+  timestampInSeconds: Int!
+  annotationType: String!
+  data: String! # Storing JSON as a String
+  createdBy: User!
+  createdAt: Timestamp!
+}
+
+type Assignment @table {
+  videoVersion: VideoVersion!
+  assignedTo: User!
+  assignedBy: User!
+  assignmentDate: Timestamp!
+  status: String!
+  dueDate: Timestamp
+  instructions: String
+}

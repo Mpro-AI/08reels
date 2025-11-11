@@ -16,9 +16,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock PINs for demo purposes
 const PINS: Record<string, User> = {
-  '123456': users.find(u => u.role === 'admin')!,
-  '1111': users.find(u => u.role === 'employee' && u.name === '員工 A')!,
-  '2222': users.find(u => u.role === 'employee' && u.name === '員工 B')!,
+  '2652': users.find(u => u.role === 'admin')!,
+  '3768': users.find(u => u.role === 'employee' && u.name === '員工 A')!,
+  '9564': users.find(u => u.role === 'employee' && u.name === '員工 B')!,
 };
 
 
