@@ -76,14 +76,6 @@ export default function CommentSection({
                 <Plus className="mr-2 h-4 w-4" />
                 新增評論
             </Button>
-            <Button variant="outline" onClick={() => onEnterAnnotationMode('pen')}>
-                <PenLine className="mr-2 h-4 w-4"/>
-                筆畫
-            </Button>
-            <Button variant="outline" onClick={() => onEnterAnnotationMode('image')}>
-                <ImageUp className="mr-2 h-4 w-4"/>
-                圖片
-            </Button>
           </div>
         </div>
         <div className="space-y-4 max-h-[calc(100vh-25rem)] overflow-y-auto pr-2">
@@ -107,11 +99,17 @@ export default function CommentSection({
                     </div>
                   <p className="text-foreground whitespace-pre-wrap">{comment.text}</p>
                 </div>
-                {canDelete(comment) && (
-                    <div className={cn(
-                        "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
-                        "opacity-0 group-hover/comment:opacity-100 transition-opacity"
-                    )}>
+                <div className={cn(
+                    "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
+                    "opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                )}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('pen'); }}>
+                        <PenLine className="h-3.5 w-3.5"/>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { onCommentClick(comment.timecode); onEnterAnnotationMode('image'); }}>
+                        <ImageUp className="h-3.5 w-3.5"/>
+                    </Button>
+                    {canDelete(comment) && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive">
@@ -131,8 +129,8 @@ export default function CommentSection({
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
-                    </div>
-                )}
+                    )}
+                </div>
               </div>
             ))
           ) : (
