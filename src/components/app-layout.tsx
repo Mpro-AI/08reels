@@ -15,13 +15,11 @@ import type { Video, User } from '@/lib/types';
 interface AppLayoutContextType {
   videos: Video[] | null;
   loading: boolean;
-  allUsers: User[] | null;
 }
 
 export const AppLayoutContext = createContext<AppLayoutContextType>({
   videos: null,
   loading: true,
-  allUsers: null,
 });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -40,12 +38,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: videos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
   
-  const usersQuery = useMemo(() => {
-    if (!firestore || !isAuthenticated) return null;
-    return collection(firestore, 'users');
-  }, [firestore, isAuthenticated]);
-  const { data: allUsers } = useCollection<User>(usersQuery);
-
   const filteredVideos = useMemo(() => {
     if (!videos || !user) return [];
     if (user.role === 'admin') {
@@ -91,7 +83,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <AppLayoutContext.Provider value={{ videos: filteredVideos, loading: videosLoading, allUsers }}>
+    <AppLayoutContext.Provider value={{ videos: filteredVideos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
           <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
