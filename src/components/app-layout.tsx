@@ -20,9 +20,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const firestore = useFirestore();
   const videosQuery = useMemo(() => {
-    if (!firestore) return null;
+    if (!firestore || !isAuthenticated) return null;
     return collection(firestore, 'videos');
-  }, [firestore]);
+  }, [firestore, isAuthenticated]);
 
   const { data: videos, loading } = useCollection<Video>(videosQuery);
 

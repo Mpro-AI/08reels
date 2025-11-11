@@ -8,13 +8,16 @@ import { collection } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useMemo } from 'react';
 import type { Video } from '@/lib/types';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
+  const { isAuthenticated } = useAuth();
+  
   const videosQuery = useMemo(() => {
-    if (!firestore) return null;
+    if (!firestore || !isAuthenticated) return null;
     return collection(firestore, 'videos');
-  }, [firestore]);
+  }, [firestore, isAuthenticated]);
 
   const { data: videos, loading } = useCollection<Video>(videosQuery);
 
