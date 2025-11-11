@@ -10,7 +10,7 @@ import {
   collection,
   writeBatch,
 } from 'firebase/firestore';
-import type { Video, Comment, VersionStatus, User, Version } from '@/lib/types';
+import type { Video, Comment, VersionStatus, User, Version, Annotation } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -29,6 +29,49 @@ export function setVideo(
     errorEmitter.emit('permission-error', permissionError);
   });
 }
+
+export function addAnnotationToVersion(
+  db: Firestore,
+  videoId: string,
+  versionId: string,
+  annotations: Omit<Annotation, 'id'>[],
+) {
+    const videoRef = doc(db, 'videos', videoId);
+    runTransaction(db, async (transaction) => {
+        const videoDoc = await transaction.get(videoRef);
+        if (!videoDoc.exists()) {
+            throw 'Video does not exist!';
+        }
+
+        const video = videoDoc.data() as Video;
+        const versionIndex = video.versions.findIndex((v) => v.id === versionId);
+        if (versionIndex === -1) {
+            throw 'Version does not exist!';
+        }
+        
+        const newAnnotationsWithIds: Annotation[] = annotations.map(anno => ({
+            ...anno,
+            id: doc(collection(db, 'dummy')).id,
+        }));
+
+        const newVersions = [...video.versions];
+        if (!newVersions[versionIndex].annotations) {
+          newVersions[versionIndex].annotations = [];
+        }
+        newVersions[versionIndex].annotations.push(...newAnnotationsWithIds);
+
+        transaction.update(videoRef, { versions: newVersions });
+    }).catch((e) => {
+        console.error("Transaction failed: ", e);
+        const permissionError = new FirestorePermissionError({
+            path: videoRef.path,
+            operation: 'update',
+            requestResourceData: { annotations },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
+}
+
 
 export function addCommentToVersion(
   db: Firestore,

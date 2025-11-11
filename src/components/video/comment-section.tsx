@@ -28,8 +28,8 @@ interface CommentSectionProps {
   inputValue: string;
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
-  onPenAnnotation: (commentId: string) => void;
-  onImageAnnotation: (commentId: string) => void;
+  onPenAnnotation: () => void;
+  onImageAnnotation: () => void;
 }
 
 export default function CommentSection({ 
@@ -73,10 +73,16 @@ export default function CommentSection({
             value={inputValue}
             onChange={(e) => onInputValueChange(e.target.value)}
           />
-          <Button className="w-full" onClick={handleAddComment} disabled={!inputValue.trim()}>
-            <Plus className="mr-2 h-4 w-4" />
-            新增評論
-          </Button>
+          <div className="flex gap-2">
+            <Button className="w-full" onClick={handleAddComment} disabled={!inputValue.trim()}>
+                <Plus className="mr-2 h-4 w-4" />
+                新增評論
+            </Button>
+            <Button variant="outline" onClick={onPenAnnotation}>
+                <PenLine className="mr-2 h-4 w-4"/>
+                註解
+            </Button>
+          </div>
         </div>
         <div className="space-y-4 max-h-[calc(100vh-25rem)] overflow-y-auto pr-2">
           {comments.length > 0 ? (
@@ -104,12 +110,6 @@ export default function CommentSection({
                         "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
                         "opacity-0 group-hover/comment:opacity-100 transition-opacity"
                     )}>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onPenAnnotation(comment.id)}>
-                            <PenLine className="h-3.5 w-3.5"/>
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onImageAnnotation(comment.id)}>
-                            <ImagePlus className="h-3.5 w-3.5"/>
-                        </Button>
                         {canDelete(comment) && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>

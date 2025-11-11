@@ -5,13 +5,16 @@ import AppLayout from '@/components/app-layout';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/video-player';
 import SidePanel from '@/components/video/side-panel';
-import type { Video, Version, Comment, VersionStatus, User } from '@/lib/types';
+import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion } from '@/firebase/firestore/videos';
+import { addCommentToVersion, setVersionStatus, deleteCommentFromVersion, addAnnotationToVersion } from '@/firebase/firestore/videos';
+import AnnotationCanvas from '@/components/video/annotation-canvas';
+import { Button } from '@/components/ui/button';
+import { X, Save } from 'lucide-react';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -38,6 +41,9 @@ export default function VideoPage() {
   const playerRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const { toast } = useToast();
+
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [newAnnotations, setNewAnnotations] = useState<Annotation[]>([]);
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
@@ -107,12 +113,47 @@ export default function VideoPage() {
 
   }, [firestore, video, user, selectedVersionId, toast]);
 
-  const handleAnnotation = (type: 'pen' | 'image') => {
+  const handlePenAnnotation = () => {
+    if (playerRef.current) {
+      playerRef.current.pause();
+    }
+    setIsDrawing(true);
+  };
+
+  const handleImageAnnotation = () => {
     toast({
-        title: '功能開發中',
-        description: `「${type === 'pen' ? '筆畫註解' : '插入圖片'}」功能即將推出！`
-    })
-  }
+      title: '功能開發中',
+      description: '「插入圖片」功能即將推出！'
+    });
+  };
+
+  const handleAddAnnotation = (data: PenAnnotationData) => {
+    if (!user) return;
+    const newAnnotation: Annotation = {
+      id: '', // Will be generated in Firestore function
+      type: 'pen',
+      data: data,
+      author: { id: user.id, name: user.name },
+      createdAt: new Date().toISOString(),
+      timecode: Math.floor(currentTime),
+    };
+    setNewAnnotations(prev => [...prev, newAnnotation]);
+  };
+
+  const handleSaveAnnotations = () => {
+    if (!firestore || !user || !video || !selectedVersionId || newAnnotations.length === 0) return;
+    
+    addAnnotationToVersion(firestore, video.id, selectedVersionId, newAnnotations);
+    
+    setNewAnnotations([]);
+    setIsDrawing(false);
+    toast({ title: '註解已儲存' });
+  };
+  
+  const handleCancelDrawing = () => {
+    setNewAnnotations([]);
+    setIsDrawing(false);
+  };
 
 
   useEffect(() => {
@@ -130,23 +171,38 @@ export default function VideoPage() {
             <div className="flex flex-1 flex-col">
                 <Header title="載入中..." />
                 <main className="flex-1 p-8 grid grid-cols-3 gap-8">
-                    <div className="col-span-2 space-y-4">
-                    </div>
-                    <div className="col-span-1 space-y-4">
-                    </div>
                 </main>
             </div>
         </AppLayout>
     );
   }
 
+  const allAnnotations = [...(selectedVersion.annotations || []), ...newAnnotations];
+
   return (
     <AppLayout>
         <div className="flex flex-1 flex-col h-screen overflow-hidden">
             <Header title={video.title} />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
-                <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center">
-                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} />
+                <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
+                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isDrawing} />
+                    {isDrawing && (
+                      <div className="absolute top-4 right-4 z-20 flex gap-2">
+                        <Button variant="outline" size="icon" onClick={handleCancelDrawing}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" onClick={handleSaveAnnotations} disabled={newAnnotations.length === 0}>
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    <AnnotationCanvas 
+                      width={playerRef.current?.clientWidth || 0}
+                      height={playerRef.current?.clientHeight || 0}
+                      annotations={allAnnotations.filter(a => a.timecode === Math.floor(currentTime))}
+                      onAddAnnotation={handleAddAnnotation}
+                      isDrawing={isDrawing}
+                    />
                 </div>
                 <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
                     <SidePanel 
@@ -158,8 +214,8 @@ export default function VideoPage() {
                         onAddComment={handleAddComment}
                         onVersionStatusChange={handleVersionStatusChange}
                         onDeleteComment={handleDeleteComment}
-                        onPenAnnotation={() => handleAnnotation('pen')}
-                        onImageAnnotation={() => handleAnnotation('image')}
+                        onPenAnnotation={handlePenAnnotation}
+                        onImageAnnotation={handleImageAnnotation}
                     />
                 </div>
             </main>

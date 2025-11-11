@@ -15,12 +15,19 @@ export type Comment = {
   createdAt: string;
 };
 
+export type PenAnnotationData = {
+  path: { x: number, y: number }[];
+  color: string;
+  lineWidth: number;
+};
+
 export type Annotation = {
     id: string;
     type: 'pen' | 'text' | 'image';
-    data: any; // Could be path for pen, text content, image url etc.
+    data: PenAnnotationData | any; // Could be path for pen, text content, image url etc.
     author: Pick<User, 'id' | 'name'>;
     createdAt: string;
+    timecode: number;
 }
 
 export type VersionStatus = 'pending_review' | 'needs_changes' | 'approved' | 'rejected';
