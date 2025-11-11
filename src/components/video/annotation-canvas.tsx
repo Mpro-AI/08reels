@@ -14,6 +14,7 @@ interface AnnotationCanvasProps {
   annotationMode: AnnotationMode;
   penColor: string;
   penLineWidth: number;
+  isAnnotating: boolean;
 }
 
 type Action = 'drawing' | 'dragging' | 'resizing' | 'rotating' | 'none';
@@ -31,6 +32,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   annotationMode,
   penColor,
   penLineWidth,
+  isAnnotating,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [action, setAction] = useState<Action>('none');

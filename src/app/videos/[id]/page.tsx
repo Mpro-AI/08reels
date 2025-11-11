@@ -319,6 +319,7 @@ export default function VideoPage() {
                       annotationMode={annotationMode}
                       penColor={penColor}
                       penLineWidth={penLineWidth}
+                      isAnnotating={isAnnotating}
                     />
                     <input 
                       type="file" 
