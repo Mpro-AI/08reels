@@ -117,7 +117,7 @@ export function addCommentToVersion(
   videoId: string,
   versionId: string,
   commentData: Omit<Comment, 'id' | 'createdAt' | 'author'>,
-  author: User,
+  author: Pick<User, 'id' | 'name'>,
 ) {
   const videoRef = doc(db, 'videos', videoId);
   runTransaction(db, async (transaction) => {

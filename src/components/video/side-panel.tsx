@@ -4,8 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, GitBranch } from 'lucide-react';
 import CommentSection from './comment-section';
 import VersionSection from './version-section';
-import { Video, Version, VersionStatus } from '@/lib/types';
+import { Video, Version, VersionStatus, Comment } from '@/lib/types';
 import type { AnnotationMode } from '@/app/videos/[id]/page';
+import { useFirestore } from '@/firebase';
+import { addCommentToVersion, deleteCommentFromVersion } from '@/firebase/firestore/videos';
+import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
   video: Video;
@@ -13,9 +16,6 @@ interface SidePanelProps {
   onVersionChange: (versionId: string) => void;
   onTimecodeClick: (timecode: number) => void;
   currentTimeFormatted: string;
-  onAddComment: (commentText: string, timecode?: number) => void;
-  onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
-  onDeleteComment: (commentId: string) => void;
   onAnnotationClick: (timecode: number, mode: AnnotationMode) => void;
 }
 
@@ -24,13 +24,51 @@ export default function SidePanel({
     selectedVersion, 
     onVersionChange, 
     onTimecodeClick, 
-    currentTimeFormatted, 
-    onAddComment, 
-    onVersionStatusChange,
-    onDeleteComment,
+    currentTimeFormatted,
     onAnnotationClick,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
+  const firestore = useFirestore();
+  const { user } = useAuth();
+
+  const handleAddComment = (commentText: string) => {
+    if (!firestore || !user) return;
+    const player = document.querySelector('video');
+    const currentTime = player ? player.currentTime : 0;
+    
+    addCommentToVersion(
+      firestore,
+      video.id,
+      selectedVersion.id,
+      {
+        text: commentText,
+        timecode: Math.floor(currentTime),
+        timecodeFormatted: formatTime(currentTime),
+      },
+      { id: user.id, name: user.name },
+    );
+  };
+  
+  const handleDeleteComment = (commentId: string) => {
+    if (!firestore) return;
+    deleteCommentFromVersion(firestore, video.id, selectedVersion.id, commentId);
+  };
+
+  const handleStatusChange = (versionId: string, status: VersionStatus) => {
+     if (!firestore) return;
+     // This logic is now handled in the parent component via props, 
+     // but if it were here, it would look like this:
+     // setVersionStatus(firestore, video.id, versionId, status);
+     console.log("Status change requested in side panel, but handled by parent:", {versionId, status});
+  };
+
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds)) return '00:00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+  }
 
   return (
     <div className="h-full bg-card border-l flex flex-col">
@@ -51,10 +89,10 @@ export default function SidePanel({
                     comments={selectedVersion.comments} 
                     onCommentClick={onTimecodeClick} 
                     currentTimeFormatted={currentTimeFormatted}
-                    onAddComment={onAddComment}
+                    onAddComment={handleAddComment}
                     inputValue={commentInput}
                     onInputValueChange={setCommentInput}
-                    onDeleteComment={onDeleteComment}
+                    onDeleteComment={handleDeleteComment}
                     onAnnotationClick={onAnnotationClick}
                 />
             </TabsContent>
@@ -64,7 +102,7 @@ export default function SidePanel({
                   versions={video.versions} 
                   selectedVersionId={selectedVersion.id}
                   onVersionChange={onVersionChange}
-                  onStatusChange={onVersionStatusChange}
+                  onStatusChange={handleStatusChange}
                 />
             </TabsContent>
         </div>

@@ -10,10 +10,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useDoc, useFirestore, useStorage } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion, addCommentToVersion } from '@/firebase/firestore/videos';
+import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
 import { uploadAnnotationImage } from '@/firebase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
+import TextAnnotationInput from '@/components/video/text-annotation-input';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -52,6 +53,9 @@ export default function VideoPage() {
   const [newAnnotations, setNewAnnotations] = useState<Annotation[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const imageAnnotationInputRef = useRef<HTMLInputElement>(null);
+
+  const [isTextAnnotating, setIsTextAnnotating] = useState(false);
+  const [textAnnotationCoords, setTextAnnotationCoords] = useState<{ x: number, y: number } | null>(null);
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
 
@@ -73,23 +77,6 @@ export default function VideoPage() {
       playerRef.current.play();
     }
   }, []);
-
-  const handleAddComment = useCallback((commentText: string) => {
-    if (!firestore || !video || !user || !selectedVersionId) return;
-    
-    addCommentToVersion(
-      firestore,
-      video.id,
-      selectedVersionId,
-      {
-        text: commentText,
-        timecode: Math.floor(currentTime),
-        timecodeFormatted: formatTime(currentTime),
-      },
-      user,
-    );
-
-  }, [firestore, video, user, currentTime, selectedVersionId]);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
     if (!firestore || !video || !user) return;
@@ -196,7 +183,7 @@ export default function VideoPage() {
     }
   };
 
-  const handleAddAnnotation = (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => {
+  const handleAddAnnotation = (data: PenAnnotationData, type: 'pen') => {
     if (!user) return;
 
     const commonData = {
@@ -213,10 +200,51 @@ export default function VideoPage() {
     };
     
     setNewAnnotations(prev => [...prev, newAnnotation]);
-    if (type === 'text') {
-      setAnnotationMode('select'); // Switch to select mode to allow interaction
-    }
   };
+
+  const handleEnterTextMode = (coords: { x: number; y: number }) => {
+    setTextAnnotationCoords(coords);
+    setIsTextAnnotating(true);
+  };
+
+  const handleCompleteTextAnnotation = (text: string) => {
+    if (!user || !textAnnotationCoords) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const fontSize = 32;
+    ctx.font = `${fontSize}px sans-serif`;
+    const textMetrics = ctx.measureText(text);
+
+    const textData: TextAnnotationData = {
+      text,
+      x: textAnnotationCoords.x - textMetrics.width / 2,
+      y: textAnnotationCoords.y - fontSize / 2,
+      width: textMetrics.width,
+      height: fontSize,
+      fontSize,
+      color: penColor,
+      rotation: 0,
+    };
+
+    const newAnnotation: Annotation = {
+      id: `new-${Date.now()}`,
+      type: 'text',
+      data: textData,
+      author: { id: user.id, name: user.name },
+      createdAt: new Date().toISOString(),
+      timecode: Math.floor(currentTime),
+    };
+
+    setNewAnnotations(prev => [...prev, newAnnotation]);
+    setIsTextAnnotating(false);
+    setTextAnnotationCoords(null);
+    setAnnotationMode('select'); // Switch to select to allow interaction with the new text
+    toast({ title: '文字註解已新增' });
+  };
+
 
   const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {
     if (updatedAnnotation.id.startsWith('new-')) {
@@ -261,6 +289,8 @@ export default function VideoPage() {
     setIsAnnotating(false);
     setAnnotationMode('select');
     setIsUploading(false);
+    setIsTextAnnotating(false);
+    setTextAnnotationCoords(null);
   };
 
 
@@ -294,7 +324,7 @@ export default function VideoPage() {
             <Header title={video.title} />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
-                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating} />
+                    <VideoPlayer src={selectedVersion.videoUrl} videoRef={playerRef} isPaused={isAnnotating || isTextAnnotating} />
                     {isAnnotating && (annotationMode === 'pen' || annotationMode === 'select') && (
                       <div className="absolute top-4 z-20 flex w-full justify-center">
                          <AnnotationToolbar
@@ -311,16 +341,30 @@ export default function VideoPage() {
                           />
                       </div>
                     )}
+                    {isTextAnnotating && textAnnotationCoords && (
+                        <TextAnnotationInput
+                            x={textAnnotationCoords.x}
+                            y={textAnnotationCoords.y}
+                            onComplete={handleCompleteTextAnnotation}
+                            onCancel={() => {
+                                setIsTextAnnotating(false);
+                                setTextAnnotationCoords(null);
+                                setIsAnnotating(false);
+                                setAnnotationMode('select');
+                            }}
+                        />
+                    )}
                     <AnnotationCanvas 
                       width={playerRef.current?.clientWidth || 0}
                       height={playerRef.current?.clientHeight || 0}
                       annotations={visibleAnnotations}
                       onAddAnnotation={handleAddAnnotation}
                       onUpdateAnnotation={handleUpdateAnnotation}
+                      onEnterTextMode={handleEnterTextMode}
                       annotationMode={annotationMode}
                       penColor={penColor}
                       penLineWidth={penLineWidth}
-                      isAnnotating={isAnnotating}
+                      isAnnotating={isAnnotating && !isTextAnnotating}
                     />
                     <input 
                       type="file" 
@@ -337,9 +381,6 @@ export default function VideoPage() {
                         onVersionChange={setSelectedVersionId}
                         onTimecodeClick={handleTimecodeClick} 
                         currentTimeFormatted={formatTime(currentTime)}
-                        onAddComment={handleAddComment}
-                        onVersionStatusChange={handleVersionStatusChange}
-                        onDeleteComment={handleDeleteComment}
                         onAnnotationClick={handleAnnotationClick}
                     />
                 </div>

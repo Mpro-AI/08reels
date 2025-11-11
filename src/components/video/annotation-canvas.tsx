@@ -9,8 +9,9 @@ interface AnnotationCanvasProps {
   width: number;
   height: number;
   annotations: Annotation[];
-  onAddAnnotation: (data: PenAnnotationData | TextAnnotationData, type: 'pen' | 'text') => void;
+  onAddAnnotation: (data: PenAnnotationData, type: 'pen') => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
+  onEnterTextMode: (coords: { x: number, y: number }) => void;
   annotationMode: AnnotationMode;
   penColor: string;
   penLineWidth: number;
@@ -29,6 +30,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   annotations,
   onAddAnnotation,
   onUpdateAnnotation,
+  onEnterTextMode,
   annotationMode,
   penColor,
   penLineWidth,
@@ -257,26 +259,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     }
 
     if (annotationMode === 'text') {
-      const text = prompt('請輸入文字：');
-      if (text) {
-        const ctx = getCanvasContext();
-        if(!ctx) return;
-        const fontSize = 32;
-        ctx.font = `${fontSize}px sans-serif`;
-        const textMetrics = ctx.measureText(text);
-        
-        const textData: TextAnnotationData = {
-          text,
-          x: coords.x - textMetrics.width / 2,
-          y: coords.y - fontSize / 2,
-          width: textMetrics.width,
-          height: fontSize,
-          fontSize: fontSize,
-          color: penColor,
-          rotation: 0,
-        };
-        onAddAnnotation(textData, 'text');
-      }
+      onEnterTextMode(coords);
       return;
     }
     
