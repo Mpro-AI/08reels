@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Comment } from '@/lib/types';
-import { format } from 'date-fns';
 import { useAuth as useAppAuth } from '@/hooks/use-auth';
 import {
   AlertDialog,
@@ -101,9 +100,6 @@ export default function CommentSection({
                     <div className="flex items-start justify-between mb-2">
                         <div>
                             <p className="font-semibold">{comment.author.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm')}
-                            </p>
                         </div>
                         <p className="text-primary font-mono text-xs">{comment.timecodeFormatted}</p>
                     </div>
