@@ -20,6 +20,7 @@ interface SidePanelProps {
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
   onNewVersionUploaded?: () => void;
   currentTimeFormatted: string;
+  isAdmin: boolean;
 }
 
 export default function SidePanel({ 
@@ -32,11 +33,11 @@ export default function SidePanel({
     onVersionStatusChange,
     onNewVersionUploaded,
     currentTimeFormatted,
+    isAdmin,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
   const firestore = useFirestore();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
 
   const handleAddComment = (commentText: string) => {
     if (!firestore || !user || !isAdmin) return;

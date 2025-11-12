@@ -135,21 +135,24 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
       // Draw bounding box
       ctx.strokeStyle = '#09f';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 / (width / 1920); // Scale line width
       ctx.strokeRect(-data.width / 2, -data.height / 2, data.width, data.height);
+      
+      const scaledHandleSize = HANDLE_SIZE / (width/1920);
       
       // Draw resize handle (bottom-right)
       ctx.fillStyle = '#09f';
-      ctx.fillRect(data.width / 2 - HANDLE_SIZE / 2, data.height / 2 - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+      ctx.fillRect(data.width / 2 - scaledHandleSize / 2, data.height / 2 - scaledHandleSize / 2, scaledHandleSize, scaledHandleSize);
 
       // Draw rotation handle (top-center)
+      const scaledRotationOffset = ROTATION_HANDLE_OFFSET / (width/1920);
       ctx.beginPath();
       ctx.moveTo(0, -data.height / 2);
-      ctx.lineTo(0, -data.height / 2 - ROTATION_HANDLE_OFFSET);
+      ctx.lineTo(0, -data.height / 2 - scaledRotationOffset);
       ctx.strokeStyle = '#09f';
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0, -data.height / 2 - ROTATION_HANDLE_OFFSET, HANDLE_SIZE / 2, 0, 2 * Math.PI);
+      ctx.arc(0, -data.height / 2 - scaledRotationOffset, scaledHandleSize / 2, 0, 2 * Math.PI);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.strokeStyle = '#09f';
@@ -227,17 +230,20 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       const rotatedX = translatedX * Math.cos(-data.rotation) - translatedY * Math.sin(-data.rotation);
       const rotatedY = translatedX * Math.sin(-data.rotation) + translatedY * Math.cos(-data.rotation);
   
+      const scaledHandleSize = HANDLE_SIZE / (width/1920);
+
       // Check resize handle
       const resizeHandleX = data.width / 2;
       const resizeHandleY = data.height / 2;
-      if (Math.abs(rotatedX - resizeHandleX) < HANDLE_SIZE && Math.abs(rotatedY - resizeHandleY) < HANDLE_SIZE) {
+      if (Math.abs(rotatedX - resizeHandleX) < scaledHandleSize && Math.abs(rotatedY - resizeHandleY) < scaledHandleSize) {
         return 'resizing';
       }
       
+      const scaledRotationOffset = ROTATION_HANDLE_OFFSET / (width/1920);
       // Check rotation handle
       const rotationHandleX = 0;
-      const rotationHandleY = -data.height / 2 - ROTATION_HANDLE_OFFSET;
-      if (Math.sqrt((rotatedX - rotationHandleX)**2 + (rotatedY - rotationHandleY)**2) < HANDLE_SIZE) {
+      const rotationHandleY = -data.height / 2 - scaledRotationOffset;
+      if (Math.sqrt((rotatedX - rotationHandleX)**2 + (rotatedY - rotationHandleY)**2) < scaledHandleSize) {
           return 'rotating';
       }
   
@@ -374,10 +380,11 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       onTouchStart={handleMouseDown}
       onTouchMove={handleMouseMove}
       onTouchEnd={handleMouseUp}
-      className="absolute top-0 left-0"
+      className="absolute top-0 left-0 w-full h-full"
       style={{ 
         pointerEvents: pointerEventsEnabled ? 'auto' : 'none',
-        cursor: cursor()
+        cursor: cursor(),
+        objectFit: 'contain'
       }}
     />
   );

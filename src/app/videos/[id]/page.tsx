@@ -56,6 +56,11 @@ export default function VideoPage() {
 
   const [isTextAnnotating, setIsTextAnnotating] = useState(false);
   const [textAnnotationCoords, setTextAnnotationCoords] = useState<{ x: number, y: number } | null>(null);
+
+  const [videoNaturalSize, setVideoNaturalSize] = useState<{width: number, height: number}>({
+    width: 1920,
+    height: 1080
+  });
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
   const currentThumbnail = selectedVersion?.thumbnailUrl || video?.thumbnailUrl;
@@ -72,6 +77,30 @@ export default function VideoPage() {
         }
     }
   }, [video, selectedVersionId]);
+
+  useEffect(() => {
+    const video = playerRef.current;
+    if (!video) return;
+
+    const handleLoadedMetadata = () => {
+      setVideoNaturalSize({
+        width: video.videoWidth,
+        height: video.videoHeight
+      });
+      console.log('📹 影片原始尺寸:', video.videoWidth, 'x', video.videoHeight);
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    
+    // 如果已經載入
+    if (video.videoWidth > 0) {
+      handleLoadedMetadata();
+    }
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, [selectedVersion?.videoUrl]);
 
   const enterAnnotationMode = (mode: AnnotationMode) => {
     if (!isAdmin) return;
@@ -144,10 +173,10 @@ export default function VideoPage() {
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
         
-        const playerWidth = playerRef.current?.clientWidth || 0;
-        const playerHeight = playerRef.current?.clientHeight || 0;
+        const canvasWidth = videoNaturalSize.width;
+        const canvasHeight = videoNaturalSize.height;
         
-        const imageWidth = 200;
+        const imageWidth = canvasWidth * 0.2; // 20% of canvas width
         const tempImage = new Image();
         tempImage.src = URL.createObjectURL(file);
         await new Promise(resolve => tempImage.onload = resolve);
@@ -160,8 +189,8 @@ export default function VideoPage() {
             type: 'image',
             data: {
                 url: imageUrl,
-                x: (playerWidth - imageWidth) / 2,
-                y: (playerHeight - imageHeight) / 2,
+                x: (canvasWidth - imageWidth) / 2,
+                y: (canvasHeight - imageHeight) / 2,
                 width: imageWidth,
                 height: imageHeight,
                 rotation: 0,
@@ -229,7 +258,7 @@ export default function VideoPage() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
   
-    const fontSize = 32;
+    const fontSize = videoNaturalSize.height * 0.03; // Font size relative to canvas height
     ctx.font = `${fontSize}px sans-serif`;
     const textMetrics = ctx.measureText(text);
   
@@ -416,8 +445,8 @@ export default function VideoPage() {
                     />
                 )}
                 <AnnotationCanvas 
-                  width={playerRef.current?.clientWidth || 0}
-                  height={playerRef.current?.clientHeight || 0}
+                  width={videoNaturalSize.width}
+                  height={videoNaturalSize.height}
                   annotations={visibleAnnotations}
                   onAddAnnotation={handleAddAnnotation}
                   onUpdateAnnotation={handleUpdateAnnotation}
@@ -452,6 +481,7 @@ export default function VideoPage() {
                         description: '資料將在短時間內更新。'
                       });
                     }}
+                    isAdmin={isAdmin}
                 />
             </div>
         </main>
