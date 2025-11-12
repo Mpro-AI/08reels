@@ -105,8 +105,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       setThumbnailPreview(null);
       setIsGeneratingThumbnail(true);
       try {
-        const thumbnailBlob = await uploadVideoAndGetUrl(storage, file, () => {}, undefined, undefined, true);
-        setThumbnailPreview(URL.createObjectURL(thumbnailBlob as unknown as Blob));
+        const thumbnailBlob = await generateVideoThumbnail(file);
+        setThumbnailPreview(URL.createObjectURL(thumbnailBlob));
       } catch (error) {
         console.error("Thumbnail generation failed:", error);
         toast({
@@ -189,16 +189,16 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <DialogHeader>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full overflow-hidden">
+            <DialogHeader className="shrink-0">
               <DialogTitle>上傳新專案影片</DialogTitle>
               <DialogDescription>
                 請提供影片標題、選擇檔案，並可選擇性地指派給特定員工。
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[calc(80vh-10rem)] pr-6">
+            <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="grid gap-4 py-4">
                 <FormField
                   control={form.control}
@@ -209,6 +209,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                       <FormControl>
                         <Input {...field} disabled={isSubmitting} />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -238,6 +239,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                             onChange={handleVideoFileChange}
                         />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -295,11 +297,6 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                   )}
                 </div>
 
-                {(form.formState.errors.title || form.formState.errors.videoFile) && (
-                    <div>
-                      <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>
-                    </div>
-                )}
                 {isSubmitting && (
                     <div className="space-y-2">
                         <Label>{isUploading ? `上傳中... ${uploadProgress.toFixed(0)}%` : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')}</Label>
@@ -308,7 +305,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                 )}
               </div>
             </ScrollArea>
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 border-t shrink-0">
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
