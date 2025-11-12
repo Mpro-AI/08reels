@@ -16,6 +16,7 @@ interface AnnotationCanvasProps {
   penColor: string;
   penLineWidth: number;
   isAnnotating: boolean;
+  videoRef?: React.RefObject<HTMLVideoElement>;
 }
 
 type Action = 'drawing' | 'dragging' | 'resizing' | 'rotating' | 'none';
@@ -35,6 +36,7 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   penColor,
   penLineWidth,
   isAnnotating,
+  videoRef,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [action, setAction] = useState<Action>('none');
@@ -47,14 +49,39 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     return canvasRef.current?.getContext('2d');
   };
 
-  // Helper to get mouse coordinates relative to the canvas
   const getCoords = (event: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    
+    // Get the actual display size of the video
+    const video = videoRef?.current;
+    let videoDisplayWidth = rect.width;
+    let videoDisplayHeight = rect.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (video && video.videoWidth && video.videoHeight) {
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const containerAspect = rect.width / rect.height;
+
+      if (containerAspect > videoAspect) {
+        // Container is wider, video is letterboxed (black bars left/right)
+        videoDisplayHeight = rect.height;
+        videoDisplayWidth = rect.height * videoAspect;
+        offsetX = (rect.width - videoDisplayWidth) / 2;
+      } else {
+        // Container is taller, video is pillarboxed (black bars top/bottom)
+        videoDisplayWidth = rect.width;
+        videoDisplayHeight = rect.width / videoAspect;
+        offsetY = (rect.height - videoDisplayHeight) / 2;
+      }
+    }
+
+    // Calculate scale ratio based on the actual video display area
+    const scaleX = canvas.width / videoDisplayWidth;
+    const scaleY = canvas.height / videoDisplayHeight;
 
     let clientX, clientY;
     if ('touches' in event.nativeEvent) {
@@ -65,10 +92,16 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       clientY = (event.nativeEvent as MouseEvent).clientY;
     }
 
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
-    };
+    // Subtract container offset and black bar offset, then scale
+    const x = (clientX - rect.left - offsetX) * scaleX;
+    const y = (clientY - rect.top - offsetY) * scaleY;
+
+    // Ensure coordinates are within the valid range
+    if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) {
+      return null; // Click was on a black bar
+    }
+
+    return { x, y };
   };
 
   // #region Drawing Logic
@@ -384,7 +417,6 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       style={{ 
         pointerEvents: pointerEventsEnabled ? 'auto' : 'none',
         cursor: cursor(),
-        objectFit: 'contain'
       }}
     />
   );

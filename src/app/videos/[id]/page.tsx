@@ -455,6 +455,7 @@ export default function VideoPage() {
                   penColor={penColor}
                   penLineWidth={penLineWidth}
                   isAnnotating={isAnnotating && !isTextAnnotating}
+                  videoRef={playerRef}
                 />
                 <input 
                   type="file" 
