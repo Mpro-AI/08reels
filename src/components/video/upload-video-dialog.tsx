@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
 import { Loader2, Image as ImageIcon, Users } from 'lucide-react';
-import { uploadVideoAndGetUrl } from '@/firebase/storage';
+import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
