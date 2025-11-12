@@ -34,10 +34,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userSnap = await getDoc(userRef);
     if (userSnap.exists()) {
       const existingData = userSnap.data() as User;
-      // If role is already admin, don't overwrite it
-      const role = existingData.role === 'admin' 
-        ? 'admin' 
-        : (await firebaseUser.getIdTokenResult()).claims.admin ? 'admin' : 'employee';
+      
+      let role = existingData.role;
+      // Force admin role for specific user
+      if (firebaseUser.uid === 'VPkSokn932hWjebe6HpAqEcUWnX2') {
+        role = 'admin';
+      } else {
+         // If role is already admin, don't overwrite it
+        role = existingData.role === 'admin' 
+          ? 'admin' 
+          : (await firebaseUser.getIdTokenResult()).claims.admin ? 'admin' : 'employee';
+      }
       
       let finalName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || existingData.name || 'Anonymous';
       // Force update name for specific user
@@ -58,12 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       // New user
       const idTokenResult = await firebaseUser.getIdTokenResult();
+      const isAdmin = idTokenResult.claims.admin || firebaseUser.uid === 'VPkSokn932hWjebe6HpAqEcUWnX2';
+
       const appUser: User = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous',
         email: firebaseUser.email,
         photoURL: firebaseUser.photoURL,
-        role: idTokenResult.claims.admin ? 'admin' : 'employee',
+        role: isAdmin ? 'admin' : 'employee',
       };
       await setDoc(userRef, appUser, { merge: true });
       return appUser;
