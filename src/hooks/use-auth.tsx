@@ -38,11 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const role = existingData.role === 'admin' 
         ? 'admin' 
         : (await firebaseUser.getIdTokenResult()).claims.admin ? 'admin' : 'employee';
+      
+      let finalName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || existingData.name || 'Anonymous';
+      // Force update name for specific user
+      if (firebaseUser.uid === 'VPkSokn932hWjebe6HpAqEcUWnX2') {
+        finalName = 'Mance';
+      }
 
       const appUser: User = {
         ...existingData,
         id: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || existingData.name || 'Anonymous',
+        name: finalName,
         email: firebaseUser.email || existingData.email,
         photoURL: firebaseUser.photoURL || existingData.photoURL,
         role: role,

@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import type { Video } from '@/lib/types';
-import { temp_updateUserName } from '@/lib/temp-update-user';
 
 interface AppLayoutContextType {
   videos: Video[] | null;
@@ -30,12 +29,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const firestore = useFirestore();
-
-  useEffect(() => {
-    if (firestore) {
-      temp_updateUserName(firestore);
-    }
-  }, [firestore]);
 
   const videosQuery = useMemo(() => {
     if (!firestore || !isAuthenticated) return null;
