@@ -58,6 +58,7 @@ export default function VideoPage() {
   const [textAnnotationCoords, setTextAnnotationCoords] = useState<{ x: number, y: number } | null>(null);
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
+  const currentThumbnail = selectedVersion?.thumbnailUrl || video?.thumbnailUrl;
 
   useEffect(() => {
     if (video && !selectedVersionId) {
@@ -373,7 +374,7 @@ export default function VideoPage() {
             <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex items-center justify-center relative">
                 <VideoPlayer 
                   src={selectedVersion.videoUrl} 
-                  poster={video.thumbnailUrl}
+                  poster={currentThumbnail}
                   videoRef={playerRef} 
                   isPaused={isAnnotating || isTextAnnotating} 
                 />

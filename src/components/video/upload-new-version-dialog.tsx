@@ -102,24 +102,26 @@ export function UploadNewVersionDialog({
     }
 
     setIsSubmitting(true);
+    const newVersionNumber = currentVersionNumber + 1;
 
     try {
       const videoFile = data.videoFile[0];
 
       // We only need the video URL, thumbnail is already set for the project.
-      const { downloadURL } = await uploadVideoAndGetUrl(
+      const { videoUrl, thumbnailUrl } = await uploadVideoAndGetUrl(
         storage,
         videoFile,
         setUploadProgress,
         videoId,
-        false // Do not generate a new thumbnail for a new version
+        newVersionNumber
       );
 
       await addNewVersion(
         firestore,
         videoId,
         {
-          videoUrl: downloadURL,
+          videoUrl: videoUrl,
+          thumbnailUrl: thumbnailUrl,
           notes: data.notes,
         },
         { id: user.id, name: user.name }
@@ -127,7 +129,7 @@ export function UploadNewVersionDialog({
 
       toast({
         title: '成功',
-        description: `新版本 v${currentVersionNumber + 1} 已上傳成功`,
+        description: `新版本 v${newVersionNumber} 已上傳成功`,
       });
       
       onSuccess?.();

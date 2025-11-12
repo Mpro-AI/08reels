@@ -63,6 +63,7 @@ export type Version = {
   isCurrentActive: boolean;
   videoUrl: string;
   notes?: string;
+  thumbnailUrl?: string; // ✅ 新增：版本專屬縮圖
 };
 
 export type Video = {

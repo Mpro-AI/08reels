@@ -286,6 +286,7 @@ export async function addVideo(
             annotations: [],
             isCurrentActive: true,
             videoUrl: newVideoData.videoUrl,
+            thumbnailUrl: newVideoData.thumbnailUrl, // Also save thumbnail for first version
             notes: newVideoData.notes,
         };
 
@@ -327,6 +328,7 @@ export async function addNewVersion(
     videoId: string,
     versionData: {
       videoUrl: string;
+      thumbnailUrl?: string;
       notes?: string;
     },
     uploader: Pick<User, 'id' | 'name'>
@@ -356,6 +358,7 @@ export async function addNewVersion(
           annotations: [],
           isCurrentActive: false,
           videoUrl: versionData.videoUrl,
+          thumbnailUrl: versionData.thumbnailUrl,
           notes: versionData.notes,
         };
   
@@ -377,3 +380,4 @@ export async function addNewVersion(
     }
   }
   
+

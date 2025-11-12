@@ -94,14 +94,19 @@ export async function generateVideoThumbnail(
  * @param storage The Firebase Storage instance.
  * @param thumbnailBlob The thumbnail blob to upload.
  * @param videoId The ID of the video project.
+ * @param versionNumber Optional version number for version-specific thumbnails.
  * @returns A promise that resolves with the public download URL of the thumbnail.
  */
 export async function uploadThumbnail(
   storage: FirebaseStorage,
   thumbnailBlob: Blob,
-  videoId: string
+  videoId: string,
+  versionNumber?: number,
 ): Promise<string> {
-  const thumbnailPath = `videos/${videoId}/thumbnail.jpg`;
+  const thumbnailPath = versionNumber
+    ? `videos/${videoId}/versions/v${versionNumber.toString().padStart(2, '0')}_thumbnail.jpg`
+    : `videos/${videoId}/thumbnail.jpg`;
+    
   const thumbnailRef = ref(storage, thumbnailPath);
   
   await uploadBytes(thumbnailRef, thumbnailBlob);
@@ -115,31 +120,30 @@ export async function uploadThumbnail(
  * @param storage The Firebase Storage instance.
  * @param file The video file to upload.
  * @param onProgress A callback function to track upload progress (0-100).
- * @param videoId The ID of the video project (optional, for organizing versions). If not provided, a new one is generated.
- * @param generateThumbnail Flag to control thumbnail generation.
- * @returns A promise that resolves with the public download URL, the videoId used, and the thumbnail URL.
+ * @param videoId The ID of the video project (optional). If not provided, a new one is generated.
+ * @param versionNumber The version number (optional). If provided, it's a new version.
+ * @returns A promise that resolves with the video URL, videoId, and thumbnail URL.
  */
 export async function uploadVideoAndGetUrl(
   storage: FirebaseStorage,
   file: File,
   onProgress: (progress: number) => void,
   videoId?: string,
-  shouldGenerateThumbnail: boolean = true
-): Promise<{ downloadURL: string; videoId: string; thumbnailUrl: string }> {
+  versionNumber?: number,
+): Promise<{ videoUrl: string; videoId: string; thumbnailUrl: string }> {
   const videoProjectId = videoId || uuidv4();
 
-  let thumbnailUrl = 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video';
-  if (shouldGenerateThumbnail) {
-    try {
-      const thumbnailBlob = await generateVideoThumbnail(file);
-      thumbnailUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId);
-    } catch (error) {
-      console.error('Thumbnail generation failed, using fallback.', error);
-    }
+  let thumbnailUrl = `https://placehold.co/600x400/208279/FFFFFF/png?text=Video`;
+  try {
+    const thumbnailBlob = await generateVideoThumbnail(file);
+    // If it's a new version, pass the version number to uploadThumbnail
+    thumbnailUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId, versionNumber);
+  } catch (error) {
+    console.error('Thumbnail generation failed, using fallback.', error);
   }
 
-  const versionId = uuidv4();
-  const storagePath = `videos/${videoProjectId}/versions/${versionId}/${file.name}`;
+  const versionIdForPath = versionNumber ? `v${versionNumber.toString().padStart(2, '0')}` : uuidv4();
+  const storagePath = `videos/${videoProjectId}/versions/${versionIdForPath}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);
@@ -159,8 +163,8 @@ export async function uploadVideoAndGetUrl(
       async () => {
         onProgress(100);
         try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({ downloadURL, videoId: videoProjectId, thumbnailUrl });
+          const videoUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ videoUrl, videoId: videoProjectId, thumbnailUrl });
         } catch (error) {
            console.error('Failed to get download URL:', error);
            reject(error);
