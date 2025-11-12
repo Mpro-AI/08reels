@@ -30,6 +30,7 @@ interface CommentSectionProps {
   onInputValueChange: (value: string) => void;
   onDeleteComment: (commentId: string) => void;
   onAnnotationClick: (timecode: number, mode: AnnotationMode) => void;
+  isAdmin: boolean;
 }
 
 export default function CommentSection({ 
@@ -41,6 +42,7 @@ export default function CommentSection({
   onInputValueChange,
   onDeleteComment,
   onAnnotationClick,
+  isAdmin,
 }: CommentSectionProps) {
   const { user } = useAppAuth();
 
@@ -70,20 +72,22 @@ export default function CommentSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Textarea 
-            placeholder="在目前時間點新增評論..." 
-            className="mb-2" 
-            value={inputValue}
-            onChange={(e) => onInputValueChange(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={handleAddComment} disabled={!inputValue.trim()}>
-                <Plus className="mr-2 h-4 w-4" />
-                新增評論
-            </Button>
-          </div>
-        </div>
+        {isAdmin && (
+            <div>
+            <Textarea 
+                placeholder="在目前時間點新增評論..." 
+                className="mb-2" 
+                value={inputValue}
+                onChange={(e) => onInputValueChange(e.target.value)}
+            />
+            <div className="flex gap-2">
+                <Button className="flex-1" onClick={handleAddComment} disabled={!inputValue.trim()}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    新增評論
+                </Button>
+            </div>
+            </div>
+        )}
         <div className="space-y-4 max-h-[calc(100vh-25rem)] overflow-y-auto pr-2">
           {comments.length > 0 ? (
             comments
@@ -105,41 +109,43 @@ export default function CommentSection({
                     </div>
                   <p className="text-foreground whitespace-pre-wrap">{comment.text}</p>
                 </div>
-                <div className={cn(
-                    "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
-                    "opacity-0 group-hover/comment:opacity-100 transition-opacity"
-                )}>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'pen')}>
-                        <PenLine className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'text')}>
-                        <Type className="h-3.5 w-3.5"/>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'image')}>
-                        <ImageUp className="h-3.5 w-3.5"/>
-                    </Button>
-                    {canDelete(comment) && (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
-                                    <Trash2 className="h-3.5 w-3.5"/>
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        這個操作無法復原。這將會永久刪除此評論。
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>取消</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => onDeleteComment(comment.id)}>確定刪除</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    )}
-                </div>
+                {isAdmin && (
+                    <div className={cn(
+                        "absolute top-1 right-1 flex items-center gap-1 rounded-full border bg-background/80 p-1 backdrop-blur-sm",
+                        "opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                    )}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'pen')}>
+                            <PenLine className="h-3.5 w-3.5"/>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'text')}>
+                            <Type className="h-3.5 w-3.5"/>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleAnnotationButtonClick(e, comment.timecode, 'image')}>
+                            <ImageUp className="h-3.5 w-3.5"/>
+                        </Button>
+                        {canDelete(comment) && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/80 hover:text-destructive" onClick={(e) => e.stopPropagation()}>
+                                        <Trash2 className="h-3.5 w-3.5"/>
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            這個操作無法復原。這將會永久刪除此評論。
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>取消</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onDeleteComment(comment.id)}>確定刪除</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
+                    </div>
+                )}
               </div>
             ))
           ) : (

@@ -36,9 +36,10 @@ export default function SidePanel({
   const [commentInput, setCommentInput] = useState('');
   const firestore = useFirestore();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const handleAddComment = (commentText: string) => {
-    if (!firestore || !user) return;
+    if (!firestore || !user || !isAdmin) return;
     const player = document.querySelector('video');
     const currentTime = player ? player.currentTime : 0;
     
@@ -87,6 +88,7 @@ export default function SidePanel({
                     onInputValueChange={setCommentInput}
                     onDeleteComment={onDeleteComment}
                     onAnnotationClick={onAnnotationClick}
+                    isAdmin={isAdmin}
                 />
             </TabsContent>
             <TabsContent value="versions" className="m-0">

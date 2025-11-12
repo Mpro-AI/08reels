@@ -59,6 +59,7 @@ export default function VideoPage() {
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
   const currentThumbnail = selectedVersion?.thumbnailUrl || video?.thumbnailUrl;
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (video && !selectedVersionId) {
@@ -73,6 +74,7 @@ export default function VideoPage() {
   }, [video, selectedVersionId]);
 
   const enterAnnotationMode = (mode: AnnotationMode) => {
+    if (!isAdmin) return;
     if (playerRef.current) {
       playerRef.current.pause();
     }
@@ -85,11 +87,12 @@ export default function VideoPage() {
   };
 
   const handleAnnotationClick = useCallback((timecode: number, mode: AnnotationMode) => {
+    if (!isAdmin) return;
     if (playerRef.current) {
       playerRef.current.currentTime = timecode;
     }
     enterAnnotationMode(mode);
-  }, []);
+  }, [isAdmin]);
 
   const handleTimecodeClick = useCallback((timecode: number) => {
     if (playerRef.current) {
@@ -378,7 +381,7 @@ export default function VideoPage() {
                   videoRef={playerRef} 
                   isPaused={isAnnotating || isTextAnnotating} 
                 />
-                {isAnnotating && (annotationMode === 'pen' || annotationMode === 'select' || annotationMode === 'text') && (
+                {isAdmin && isAnnotating && (annotationMode === 'pen' || annotationMode === 'select' || annotationMode === 'text') && (
                   <div className="absolute top-4 z-20 flex w-full justify-center">
                      <AnnotationToolbar
                         mode={annotationMode}
@@ -399,7 +402,7 @@ export default function VideoPage() {
                       />
                   </div>
                 )}
-                {isTextAnnotating && textAnnotationCoords && (
+                {isAdmin && isTextAnnotating && textAnnotationCoords && (
                     <TextAnnotationInput
                         x={textAnnotationCoords.x}
                         y={textAnnotationCoords.y}
