@@ -104,7 +104,7 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
   }, [videoRef]);
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto bg-black rounded-lg overflow-hidden group" style={{ aspectRatio: '16/9', maxHeight: '720px' }}>
+    <div className="relative w-full h-full bg-black rounded-lg overflow-hidden group">
       <video ref={videoRef} src={src} poster={poster} className="w-full h-full object-contain" onClick={togglePlay} />
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <Slider
