@@ -99,11 +99,11 @@ export default function VideoPage() {
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
     if (!firestore || !video || !user) return;
     
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.id !== video.author.id) {
         toast({
             variant: 'destructive',
             title: '權限不足',
-            description: '只有管理員才能變更版本狀態。'
+            description: '只有管理員或專案作者才能變更版本狀態。'
         });
         return;
     }
@@ -348,7 +348,7 @@ export default function VideoPage() {
         <>
             <Header title="載入中..." />
             <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
-                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 flex items-center justify-center relative">
+                 <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex items-center justify-center relative">
                     <Skeleton className="w-full aspect-video" />
                  </div>
                  <div className="lg:col-span-1 xl:col-span-1 h-full overflow-y-auto">
@@ -370,7 +370,7 @@ export default function VideoPage() {
     <>
         <Header title={video.title} />
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
-            <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex flex-col items-center justify-center relative">
+            <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex items-center justify-center relative">
                 <VideoPlayer 
                   src={selectedVersion.videoUrl} 
                   poster={video.thumbnailUrl}
@@ -441,6 +441,13 @@ export default function VideoPage() {
                     currentTimeFormatted={formatTime(currentTime)}
                     onDeleteComment={handleDeleteComment}
                     onVersionStatusChange={handleVersionStatusChange}
+                    onNewVersionUploaded={() => {
+                      // Data will automatically refresh via useDoc subscription
+                      toast({
+                        title: '新版本已上傳',
+                        description: '資料將在短時間內更新。'
+                      });
+                    }}
                 />
             </div>
         </main>

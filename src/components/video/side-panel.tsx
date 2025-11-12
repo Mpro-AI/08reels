@@ -18,6 +18,7 @@ interface SidePanelProps {
   onAnnotationClick: (timecode: number, mode: AnnotationMode) => void;
   onDeleteComment: (commentId: string) => void;
   onVersionStatusChange: (versionId: string, status: VersionStatus) => void;
+  onNewVersionUploaded?: () => void;
   currentTimeFormatted: string;
 }
 
@@ -29,6 +30,7 @@ export default function SidePanel({
     onAnnotationClick,
     onDeleteComment,
     onVersionStatusChange,
+    onNewVersionUploaded,
     currentTimeFormatted,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
@@ -94,6 +96,7 @@ export default function SidePanel({
                   selectedVersionId={selectedVersion.id}
                   onVersionChange={onVersionChange}
                   onStatusChange={onVersionStatusChange}
+                  onNewVersionUploaded={onNewVersionUploaded}
                 />
             </TabsContent>
         </div>

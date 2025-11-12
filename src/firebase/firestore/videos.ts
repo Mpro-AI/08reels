@@ -314,3 +314,66 @@ export async function addVideo(
         throw e;
     }
 }
+
+/**
+ * Adds a new version to a video project.
+ * @param db Firestore instance
+ * @param videoId The ID of the video to update
+ * @param versionData Data for the new version
+ * @param uploader The user uploading the new version
+ */
+export async function addNewVersion(
+    db: Firestore,
+    videoId: string,
+    versionData: {
+      videoUrl: string;
+      notes?: string;
+    },
+    uploader: Pick<User, 'id' | 'name'>
+  ): Promise<void> {
+    const videoRef = doc(db, 'videos', videoId);
+  
+    try {
+      await runTransaction(db, async (transaction) => {
+        const videoDoc = await transaction.get(videoRef);
+        
+        if (!videoDoc.exists()) {
+          throw new Error('影片不存在');
+        }
+  
+        const video = videoDoc.data() as Video;
+        
+        const maxVersionNumber = Math.max(0, ...video.versions.map((v) => v.versionNumber));
+        const newVersionNumber = maxVersionNumber + 1;
+  
+        const newVersion: Version = {
+          id: doc(collection(db, 'dummy')).id,
+          versionNumber: newVersionNumber,
+          status: 'pending_review',
+          createdAt: Timestamp.now().toDate().toISOString(),
+          uploader: uploader,
+          comments: [],
+          annotations: [],
+          isCurrentActive: false,
+          videoUrl: versionData.videoUrl,
+          notes: versionData.notes,
+        };
+  
+        const updatedVersions = [...video.versions, newVersion];
+  
+        transaction.update(videoRef, {
+          versions: updatedVersions,
+        });
+      });
+    } catch (error) {
+      console.error('Add new version failed:', error);
+      const permissionError = new FirestorePermissionError({
+        path: videoRef.path,
+        operation: 'update',
+        requestResourceData: { newVersion: versionData },
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      throw error;
+    }
+  }
+  

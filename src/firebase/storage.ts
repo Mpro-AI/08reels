@@ -116,26 +116,28 @@ export async function uploadThumbnail(
  * @param file The video file to upload.
  * @param onProgress A callback function to track upload progress (0-100).
  * @param videoId The ID of the video project (optional, for organizing versions). If not provided, a new one is generated.
+ * @param generateThumbnail Flag to control thumbnail generation.
  * @returns A promise that resolves with the public download URL, the videoId used, and the thumbnail URL.
  */
 export async function uploadVideoAndGetUrl(
   storage: FirebaseStorage,
   file: File,
   onProgress: (progress: number) => void,
-  videoId?: string
+  videoId?: string,
+  shouldGenerateThumbnail: boolean = true
 ): Promise<{ downloadURL: string; videoId: string; thumbnailUrl: string }> {
   const videoProjectId = videoId || uuidv4();
 
-  // 1. Generate and upload thumbnail first
-  let thumbnailUrl = 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video'; // Fallback
-  try {
-    const thumbnailBlob = await generateVideoThumbnail(file);
-    thumbnailUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId);
-  } catch (error) {
-    console.error('Thumbnail generation failed, using fallback.', error);
+  let thumbnailUrl = 'https://placehold.co/600x400/208279/FFFFFF/png?text=Video';
+  if (shouldGenerateThumbnail) {
+    try {
+      const thumbnailBlob = await generateVideoThumbnail(file);
+      thumbnailUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId);
+    } catch (error) {
+      console.error('Thumbnail generation failed, using fallback.', error);
+    }
   }
 
-  // 2. Proceed with video upload
   const versionId = uuidv4();
   const storagePath = `videos/${videoProjectId}/versions/${versionId}/${file.name}`;
   const storageRef = ref(storage, storagePath);

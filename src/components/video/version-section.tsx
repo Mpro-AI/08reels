@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Version, VersionStatus, Video } from '@/lib/types';
-import { GitBranch, Check, X, Edit, Upload, Star, StickyNote } from 'lucide-react';
+import { GitBranch, Check, X, Edit, Upload, Star, StickyNote, Plus } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { UploadNewVersionDialog } from './upload-new-version-dialog';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: React.ReactNode }> = {
     approved: { text: '已核可', variant: 'default', icon: <Check className="size-3" /> },
@@ -33,6 +34,7 @@ interface VersionSectionProps {
     selectedVersionId: string;
     onVersionChange: (versionId: string) => void;
     onStatusChange: (versionId: string, status: VersionStatus) => void;
+    onNewVersionUploaded?: () => void;
 }
 
 const StatusButton = ({
@@ -74,14 +76,35 @@ const StatusButton = ({
 )
 
 
-export default function VersionSection({ video, versions, selectedVersionId, onVersionChange, onStatusChange }: VersionSectionProps) {
+export default function VersionSection({ 
+    video, 
+    versions, 
+    selectedVersionId, 
+    onVersionChange, 
+    onStatusChange,
+    onNewVersionUploaded
+}: VersionSectionProps) {
     const { user } = useAuth();
     const isOwner = user?.id === video.author.id;
+    const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+    const maxVersionNumber = Math.max(...versions.map(v => v.versionNumber));
 
   return (
     <Card className="border-0 shadow-none">
       <CardHeader>
-        <CardTitle className="text-base">版本控制</CardTitle>
+        <div className="flex items-center justify-between">
+            <CardTitle className="text-base">版本控制</CardTitle>
+            <Button
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                onClick={() => setShowUploadDialog(true)}
+            >
+                <Plus className="h-4 w-4" />
+                上傳新版本
+            </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3 max-h-[calc(100vh-22rem)] overflow-y-auto pr-2">
@@ -160,6 +183,15 @@ export default function VersionSection({ video, versions, selectedVersionId, onV
             })}
         </div>
       </CardContent>
+       <UploadNewVersionDialog
+        isOpen={showUploadDialog}
+        onOpenChange={setShowUploadDialog}
+        videoId={video.id}
+        currentVersionNumber={maxVersionNumber}
+        onSuccess={() => {
+          onNewVersionUploaded?.();
+        }}
+      />
     </Card>
   );
 }
