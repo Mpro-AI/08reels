@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
 import { Loader2, Image as ImageIcon, Users } from 'lucide-react';
-import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/firebase/storage';
+import { uploadVideoAndGetUrl } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
@@ -105,8 +105,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       setThumbnailPreview(null);
       setIsGeneratingThumbnail(true);
       try {
-        const thumbnailBlob = await generateVideoThumbnail(file);
-        setThumbnailPreview(URL.createObjectURL(thumbnailBlob));
+        const thumbnailBlob = await uploadVideoAndGetUrl(storage, file, () => {}, undefined, undefined, true);
+        setThumbnailPreview(URL.createObjectURL(thumbnailBlob as unknown as Blob));
       } catch (error) {
         console.error("Thumbnail generation failed:", error);
         toast({
@@ -150,7 +150,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     try {
         const videoFile = data.videoFile[0];
 
-        const { downloadURL, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(
+        const { videoUrl, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(
           storage, 
           videoFile, 
           setUploadProgress
@@ -158,7 +158,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
 
         const newVideoData = {
             title: data.title,
-            videoUrl: downloadURL,
+            videoUrl: videoUrl,
             thumbnailUrl: thumbnailUrl,
             notes: data.notes,
             assignedUserIds: selectedUserIds,
@@ -198,115 +198,117 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                 請提供影片標題、選擇檔案，並可選擇性地指派給特定員工。
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>標題</FormLabel>
-                    <FormControl>
-                      <Input {...field} disabled={isSubmitting} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>備註 (選填)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="videoFile"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>影片檔案</FormLabel>
-                    <FormControl>
-                       <Input 
-                          type="file" 
-                          accept={ACCEPTED_VIDEO_TYPES.join(',')}
-                          disabled={isSubmitting}
-                          onChange={handleVideoFileChange}
-                       />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              {thumbnailPreview || isGeneratingThumbnail ? (
-                 <div className="space-y-2">
-                    <Label>縮圖預覽</Label>
-                    <div className="aspect-video w-full rounded-md overflow-hidden relative bg-muted flex items-center justify-center">
-                      {isGeneratingThumbnail && <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />}
-                      {thumbnailPreview && !isGeneratingThumbnail && (
-                        <Image src={thumbnailPreview} alt="Video thumbnail preview" fill className="object-contain" />
-                      )}
-                    </div>
-                 </div>
-              ) : null}
-
-              <div className="space-y-2">
-                <Label>指派給用戶 (選填)</Label>
-                <p className="text-sm text-muted-foreground">選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。</p>
-                {isLoadingEmployees ? (
-                  <Skeleton className="h-24 w-full" />
-                ) : (
-                  <div className='rounded-md border'>
-                    <div className='flex items-center justify-between p-2 border-b'>
-                       <Label className='flex items-center gap-2 font-normal text-sm'>
-                          <Checkbox
-                              checked={employees.length > 0 && selectedUserIds.length === employees.length}
-                              onCheckedChange={handleSelectAll}
-                              id="select-all-users"
-                            />
-                            全選
-                       </Label>
-                       <span className="text-sm text-muted-foreground">{selectedUserIds.length} / {employees.length} 已選擇</span>
-                    </div>
-                    <ScrollArea className="h-32">
-                      <div className="p-2 space-y-2">
-                        {employees.map(employee => (
-                          <div key={employee.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`user-${employee.id}`}
-                              checked={selectedUserIds.includes(employee.id)}
-                              onCheckedChange={(checked) => {
-                                setSelectedUserIds(prev => 
-                                  checked ? [...prev, employee.id] : prev.filter(id => id !== employee.id)
-                                )
-                              }}
-                            />
-                            <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
-                              {employee.name}
-                            </Label>
-                          </div>
-                        ))}
+            <ScrollArea className="max-h-[calc(80vh-10rem)] pr-6">
+              <div className="grid gap-4 py-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>標題</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled={isSubmitting} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>備註 (選填)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="videoFile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>影片檔案</FormLabel>
+                      <FormControl>
+                        <Input 
+                            type="file" 
+                            accept={ACCEPTED_VIDEO_TYPES.join(',')}
+                            disabled={isSubmitting}
+                            onChange={handleVideoFileChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                {thumbnailPreview || isGeneratingThumbnail ? (
+                  <div className="space-y-2">
+                      <Label>縮圖預覽</Label>
+                      <div className="aspect-video w-full rounded-md overflow-hidden relative bg-muted flex items-center justify-center">
+                        {isGeneratingThumbnail && <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />}
+                        {thumbnailPreview && !isGeneratingThumbnail && (
+                          <Image src={thumbnailPreview} alt="Video thumbnail preview" fill className="object-contain" />
+                        )}
                       </div>
-                    </ScrollArea>
                   </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label>指派給用戶 (選填)</Label>
+                  <p className="text-sm text-muted-foreground">選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。</p>
+                  {isLoadingEmployees ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : (
+                    <div className='rounded-md border'>
+                      <div className='flex items-center justify-between p-2 border-b'>
+                        <Label className='flex items-center gap-2 font-normal text-sm'>
+                            <Checkbox
+                                checked={employees.length > 0 && selectedUserIds.length === employees.length}
+                                onCheckedChange={handleSelectAll}
+                                id="select-all-users"
+                              />
+                              全選
+                        </Label>
+                        <span className="text-sm text-muted-foreground">{selectedUserIds.length} / {employees.length} 已選擇</span>
+                      </div>
+                      <ScrollArea className="h-32">
+                        <div className="p-2 space-y-2">
+                          {employees.map(employee => (
+                            <div key={employee.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`user-${employee.id}`}
+                                checked={selectedUserIds.includes(employee.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedUserIds(prev => 
+                                    checked ? [...prev, employee.id] : prev.filter(id => id !== employee.id)
+                                  )
+                                }}
+                              />
+                              <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
+                                {employee.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+
+                {(form.formState.errors.title || form.formState.errors.videoFile) && (
+                    <div>
+                      <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>
+                    </div>
+                )}
+                {isSubmitting && (
+                    <div className="space-y-2">
+                        <Label>{isUploading ? `上傳中... ${uploadProgress.toFixed(0)}%` : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')}</Label>
+                        <Progress value={uploadProgress} />
+                    </div>
                 )}
               </div>
-
-               {(form.formState.errors.title || form.formState.errors.videoFile) && (
-                  <div>
-                    <FormMessage>{form.formState.errors.title?.message || form.formState.errors.videoFile?.message?.toString()}</FormMessage>
-                  </div>
-              )}
-              {isSubmitting && (
-                  <div className="space-y-2">
-                      <Label>{isUploading ? `上傳中... ${uploadProgress.toFixed(0)}%` : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')}</Label>
-                      <Progress value={uploadProgress} />
-                  </div>
-              )}
-            </div>
-            <DialogFooter>
+            </ScrollArea>
+            <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
