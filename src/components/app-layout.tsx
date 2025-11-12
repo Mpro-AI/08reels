@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { Film, LogOut, Home } from 'lucide-react';
+import { Film, LogOut, Home, Shield } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           </Link>
                       </SidebarMenuButton>
                   </SidebarMenuItem>
+                  {user?.role === 'admin' && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="後台管理" isActive={pathname === '/admin'}>
+                        <Link href="/admin">
+                          <Shield />
+                          <span>後台管理</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
               </SidebarMenu>
               <SidebarMenu className="mt-4">
                   <p className="px-4 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
