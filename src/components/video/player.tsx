@@ -3,22 +3,31 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Loader2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
+import { QualitySelector } from './quality-selector';
+import { QualityOption } from '@/lib/types';
 
 interface VideoPlayerProps {
   src: string;
   poster?: string;
   videoRef: React.RefObject<HTMLVideoElement>;
   isPaused?: boolean;
+  qualities?: QualityOption[]; // ✅ 新增：接收畫質選項
 }
 
-export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPlayerProps) {
+export default function VideoPlayer({ src, poster, videoRef, isPaused, qualities }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false); // ✅ 新增
-  const [bufferedPercentage, setBufferedPercentage] = useState(0); // ✅ 新增
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [bufferedPercentage, setBufferedPercentage] = useState(0);
+  const [currentSrc, setCurrentSrc] = useState(src); // ✅ 新增：管理當前播放源
   const wasPlayingBeforeSeek = useRef(false);
+
+  // 當外部 src 變化時，更新內部播放源
+  useEffect(() => {
+    setCurrentSrc(src);
+  }, [src]);
 
   // 外部暫停控制
   useEffect(() => {
@@ -28,6 +37,24 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
       }
     }
   }, [isPaused, videoRef]);
+
+  // ✅ 新增：畫質切換邏輯
+  const handleQualityChange = (newUrl: string) => {
+    if (videoRef.current) {
+      const currentTime = videoRef.current.currentTime;
+      const wasPlaying = !videoRef.current.paused;
+
+      videoRef.current.src = newUrl;
+      setCurrentSrc(newUrl);
+
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current!.currentTime = currentTime;
+        if (wasPlaying) {
+          videoRef.current!.play();
+        }
+      };
+    }
+  };
 
   const togglePlay = () => {
     if (isPaused) return;
@@ -81,12 +108,10 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
     const video = videoRef.current;
     if (!video) return;
 
-    // ✅ 優化：進度更新
     const handleTimeUpdate = () => {
       setProgress((video.currentTime / video.duration) * 100 || 0);
     };
 
-    // ✅ 優化：緩衝進度
     const handleProgress = () => {
       if (video.buffered.length > 0) {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
@@ -95,7 +120,6 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
       }
     };
 
-    // ✅ 優化：緩衝狀態
     const handleWaiting = () => {
       console.log('🔄 緩衝中...');
       setIsBuffering(true);
@@ -111,7 +135,6 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
       setIsBuffering(false);
     };
 
-    // ✅ 優化：錯誤處理
     const handleError = (e: Event) => {
       console.error('❌ 視頻加載錯誤:', video.error);
       setIsBuffering(false);
@@ -121,7 +144,6 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
-    // 添加所有事件監聽
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('progress', handleProgress);
     video.addEventListener('waiting', handleWaiting);
@@ -145,23 +167,21 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
     };
-  }, [videoRef]);
+  }, [videoRef, currentSrc]); // ✅ 監聽 currentSrc 的變化
 
   return (
     <div className="relative w-full h-full bg-black rounded-lg overflow-hidden group">
-      {/* ✅ 優化：添加 video 屬性 */}
       <video 
         ref={videoRef} 
-        src={src} 
+        src={currentSrc} // ✅ 使用 state 管理的 src
         poster={poster} 
         className="w-full h-full object-contain" 
         onClick={togglePlay}
-        preload="metadata" // ✅ 預加載元數據
-        playsInline // ✅ iOS 內聯播放
-        crossOrigin="anonymous" // ✅ CORS
+        preload="metadata"
+        playsInline
+        crossOrigin="anonymous"
       />
       
-      {/* ✅ 新增：緩衝指示器 */}
       {isBuffering && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
           <div className="flex flex-col items-center gap-2">
@@ -172,15 +192,12 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
       )}
       
       <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        {/* ✅ 新增：緩衝進度條 */}
         <div className="relative w-full h-2 mb-2 group">
            <div className="absolute top-1/2 -translate-y-1/2 w-full h-1 bg-gray-500/30 rounded-full">
-                {/* 緩衝進度（灰色） */}
                 <div 
                     className="absolute top-0 left-0 h-full bg-gray-500/70 rounded-full"
                     style={{ width: `${bufferedPercentage}%` }}
                 />
-                 {/* 播放進度條軌道 */}
                 <Slider
                     value={[progress]}
                     onValueChange={handleProgressChange}
@@ -209,7 +226,14 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused }: VideoPl
             </Button>
           </div>
           <div className="flex items-center gap-1 md:gap-2">
-             {/* ✅ 新增：播放速度 */}
+            {/* ✅ 新增：畫質選擇器 */}
+            {qualities && (
+              <QualitySelector 
+                qualities={qualities}
+                currentUrl={currentSrc}
+                onQualityChange={handleQualityChange}
+              />
+            )}
             <select
               className="bg-transparent text-white text-xs md:text-sm border border-white/20 rounded px-1 md:px-2 py-1"
               onChange={(e) => {

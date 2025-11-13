@@ -439,7 +439,8 @@ export default function VideoPage() {
                   src={selectedVersion.videoUrl} 
                   poster={currentThumbnail}
                   videoRef={playerRef} 
-                  isPaused={isAnnotating || isTextAnnotating} 
+                  isPaused={isAnnotating || isTextAnnotating}
+                  qualities={selectedVersion.qualities}
                 />
                 {isAdmin && isAnnotating && (
                   <div className="absolute top-4 z-20 flex w-full justify-center">
