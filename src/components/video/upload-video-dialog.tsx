@@ -190,17 +190,21 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[600px] h-[90vh] overflow-hidden flex flex-col p-0">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full overflow-hidden">
-            <DialogHeader className="shrink-0">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+            {/* 標題 - 固定不滾動 */}
+            <div className="shrink-0 px-6 pt-6 pb-4 border-b">
               <DialogTitle>上傳新專案影片</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="mt-2">
                 請提供影片標題、選擇檔案，並可選擇性地指派給特定員工。
               </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="flex-1 -mx-6 px-6">
-              <div className="grid gap-4 py-4">
+            </div>
+            
+            {/* 內容 - 可滾動 */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="px-6 py-4 space-y-4">
+                {/* 標題 */}
                 <FormField
                   control={form.control}
                   name="title"
@@ -214,6 +218,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                     </FormItem>
                   )}
                 />
+                
+                {/* 備註 */}
                 <FormField
                   control={form.control}
                   name="notes"
@@ -221,11 +227,18 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                     <FormItem>
                       <FormLabel>備註 (選填)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="影片內容、目標客群等..." {...field} disabled={isSubmitting}/>
+                        <Textarea 
+                          placeholder="影片內容、目標客群等..." 
+                          {...field} 
+                          disabled={isSubmitting}
+                          rows={3}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
                 />
+                
+                {/* 影片檔案 */}
                 <FormField
                   control={form.control}
                   name="videoFile"
@@ -234,48 +247,62 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                       <FormLabel>影片檔案</FormLabel>
                       <FormControl>
                         <Input 
-                            type="file" 
-                            accept={ACCEPTED_VIDEO_TYPES.join(',')}
-                            disabled={isSubmitting}
-                            onChange={handleVideoFileChange}
+                          type="file" 
+                          accept={ACCEPTED_VIDEO_TYPES.join(',')}
+                          disabled={isSubmitting}
+                          onChange={handleVideoFileChange}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {thumbnailPreview || isGeneratingThumbnail ? (
+                
+                {/* 縮圖預覽 */}
+                {(thumbnailPreview || isGeneratingThumbnail) && (
                   <div className="space-y-2">
-                      <Label>縮圖預覽</Label>
-                      <div className="aspect-video w-full rounded-md overflow-hidden relative bg-muted flex items-center justify-center">
-                        {isGeneratingThumbnail && <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />}
-                        {thumbnailPreview && !isGeneratingThumbnail && (
-                          <Image src={thumbnailPreview} alt="Video thumbnail preview" fill className="object-contain" />
-                        )}
-                      </div>
+                    <Label>縮圖預覽</Label>
+                    <div className="aspect-video w-full rounded-md overflow-hidden relative bg-muted flex items-center justify-center">
+                      {isGeneratingThumbnail && (
+                        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+                      )}
+                      {thumbnailPreview && !isGeneratingThumbnail && (
+                        <Image 
+                          src={thumbnailPreview} 
+                          alt="Video thumbnail preview" 
+                          fill 
+                          className="object-contain" 
+                        />
+                      )}
+                    </div>
                   </div>
-                ) : null}
-
+                )}
+                
+                {/* 用戶指派 */}
                 {isAdmin && (
                   <div className="space-y-2">
                     <Label>指派給用戶 (選填)</Label>
-                    <p className="text-sm text-muted-foreground">選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。</p>
+                    <p className="text-sm text-muted-foreground">
+                      選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。
+                    </p>
                     {isLoadingEmployees ? (
                       <Skeleton className="h-24 w-full" />
                     ) : (
                       <div className='rounded-md border'>
-                        <div className='flex items-center justify-between p-2 border-b'>
-                          <Label className='flex items-center gap-2 font-normal text-sm'>
-                              <Checkbox
-                                  checked={employees.length > 0 && selectedUserIds.length === employees.length}
-                                  onCheckedChange={handleSelectAll}
-                                  id="select-all-users"
-                                />
-                                全選
+                        <div className='flex items-center justify-between p-2 border-b bg-muted/50'>
+                          <Label className='flex items-center gap-2 font-normal text-sm m-0'>
+                            <Checkbox
+                              checked={employees.length > 0 && selectedUserIds.length === employees.length}
+                              onCheckedChange={handleSelectAll}
+                              id="select-all-users"
+                            />
+                            全選
                           </Label>
-                          <span className="text-sm text-muted-foreground">{selectedUserIds.length} / {employees.length} 已選擇</span>
+                          <span className="text-sm text-muted-foreground">
+                            {selectedUserIds.length} / {employees.length} 已選擇
+                          </span>
                         </div>
-                        <ScrollArea className="h-32">
+                        <div className="max-h-40 overflow-y-auto">
                           <div className="p-2 space-y-2">
                             {employees.map(employee => (
                               <div key={employee.id} className="flex items-center space-x-2">
@@ -288,33 +315,57 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                                     )
                                   }}
                                 />
-                                <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
+                                <Label 
+                                  htmlFor={`user-${employee.id}`} 
+                                  className="font-normal w-full cursor-pointer"
+                                >
                                   {employee.name}
                                 </Label>
                               </div>
                             ))}
                           </div>
-                        </ScrollArea>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
-
+                {/* 上傳進度 */}
                 {isSubmitting && (
-                    <div className="space-y-2">
-                        <Label>{isUploading ? `上傳中... ${uploadProgress.toFixed(0)}%` : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')}</Label>
-                        <Progress value={uploadProgress} />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>
+                      {isUploading 
+                        ? `上傳中... ${uploadProgress.toFixed(0)}%` 
+                        : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')
+                      }
+                    </Label>
+                    <Progress value={uploadProgress} />
+                  </div>
                 )}
               </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4 border-t shrink-0">
-              <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>取消</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isUploading ? '上傳中' : '處理中'}</> : '提交'}
+            </div>
+            
+            {/* 按鈕 - 固定不滾動 */}
+            <div className="shrink-0 flex justify-end gap-2 px-6 py-4 border-t bg-background">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={handleClose} 
+                disabled={isSubmitting}
+              >
+                取消
               </Button>
-            </DialogFooter>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isUploading ? '上傳中' : '處理中'}
+                  </>
+                ) : (
+                  '提交'
+                )}
+              </Button>
+            </div>
           </form>
         </Form>
       </DialogContent>
