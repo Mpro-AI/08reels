@@ -66,6 +66,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
   const { user } = useAuth();
   const firestore = useFirestore();
   const storage = useStorage();
+  const isAdmin = user?.role === 'admin';
 
   const form = useForm<UploadVideoForm>({
     resolver: zodResolver(formSchema),
@@ -79,7 +80,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (isOpen && firestore) {
+      if (isOpen && firestore && isAdmin) {
         setIsLoadingEmployees(true);
         try {
           const employeeList = await getAllEmployees(firestore);
@@ -94,7 +95,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       }
     };
     fetchEmployees();
-  }, [isOpen, firestore, toast, user]);
+  }, [isOpen, firestore, toast, user, isAdmin]);
 
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -161,7 +162,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
             videoUrl: videoUrl,
             thumbnailUrl: thumbnailUrl,
             notes: data.notes,
-            assignedUserIds: selectedUserIds,
+            assignedUserIds: isAdmin ? selectedUserIds : [],
         };
         await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
         toast({ title: '成功', description: '新影片專案已成功建立。' });
@@ -255,47 +256,50 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                   </div>
                 ) : null}
 
-                <div className="space-y-2">
-                  <Label>指派給用戶 (選填)</Label>
-                  <p className="text-sm text-muted-foreground">選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。</p>
-                  {isLoadingEmployees ? (
-                    <Skeleton className="h-24 w-full" />
-                  ) : (
-                    <div className='rounded-md border'>
-                      <div className='flex items-center justify-between p-2 border-b'>
-                        <Label className='flex items-center gap-2 font-normal text-sm'>
-                            <Checkbox
-                                checked={employees.length > 0 && selectedUserIds.length === employees.length}
-                                onCheckedChange={handleSelectAll}
-                                id="select-all-users"
-                              />
-                              全選
-                        </Label>
-                        <span className="text-sm text-muted-foreground">{selectedUserIds.length} / {employees.length} 已選擇</span>
-                      </div>
-                      <ScrollArea className="h-32">
-                        <div className="p-2 space-y-2">
-                          {employees.map(employee => (
-                            <div key={employee.id} className="flex items-center space-x-2">
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <Label>指派給用戶 (選填)</Label>
+                    <p className="text-sm text-muted-foreground">選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。</p>
+                    {isLoadingEmployees ? (
+                      <Skeleton className="h-24 w-full" />
+                    ) : (
+                      <div className='rounded-md border'>
+                        <div className='flex items-center justify-between p-2 border-b'>
+                          <Label className='flex items-center gap-2 font-normal text-sm'>
                               <Checkbox
-                                id={`user-${employee.id}`}
-                                checked={selectedUserIds.includes(employee.id)}
-                                onCheckedChange={(checked) => {
-                                  setSelectedUserIds(prev => 
-                                    checked ? [...prev, employee.id] : prev.filter(id => id !== employee.id)
-                                  )
-                                }}
-                              />
-                              <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
-                                {employee.name}
-                              </Label>
-                            </div>
-                          ))}
+                                  checked={employees.length > 0 && selectedUserIds.length === employees.length}
+                                  onCheckedChange={handleSelectAll}
+                                  id="select-all-users"
+                                />
+                                全選
+                          </Label>
+                          <span className="text-sm text-muted-foreground">{selectedUserIds.length} / {employees.length} 已選擇</span>
                         </div>
-                      </ScrollArea>
-                    </div>
-                  )}
-                </div>
+                        <ScrollArea className="h-32">
+                          <div className="p-2 space-y-2">
+                            {employees.map(employee => (
+                              <div key={employee.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`user-${employee.id}`}
+                                  checked={selectedUserIds.includes(employee.id)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedUserIds(prev => 
+                                      checked ? [...prev, employee.id] : prev.filter(id => id !== employee.id)
+                                    )
+                                  }}
+                                />
+                                <Label htmlFor={`user-${employee.id}`} className="font-normal w-full">
+                                  {employee.name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
                 {isSubmitting && (
                     <div className="space-y-2">
