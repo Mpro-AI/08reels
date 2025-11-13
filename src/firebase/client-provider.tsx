@@ -27,7 +27,8 @@ export function FirebaseClientProvider({
         const app = await initializeFirebase();
         const auth = getAuth(app);
         const firestore = getFirestore(app);
-        const storage = getStorage(app);
+        // ✅ Explicitly set the custom storage bucket here.
+        const storage = getStorage(app, 'gs://reels08team');
         setFirebase({ app, auth, firestore, storage });
       } catch (error) {
         console.error("Firebase initialization failed:", error);
