@@ -1,19 +1,69 @@
 rules_version = '2';
 
 service firebase.storage {
+  // ✅ 適用於所有 buckets
   match /b/{bucket}/o {
     
-    // ========== Helper Functions ==========
+    // ========== 輔助函數 ==========
+    
     function isSignedIn() {
       return request.auth != null;
     }
-
-    // ========== Main Rule for Videos ==========
-    // Allow any signed-in user to read and write anything inside the /videos folder.
-    // This is a broad rule for debugging and ensuring functionality.
-    // It covers main thumbnails, version thumbnails, video files, and annotations.
-    match /videos/{videoId}/{allPaths=**} {
-      allow read, write: if isSignedIn();
+    
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
+    
+    function fileSizeUnder(sizeMB) {
+      return request.resource.size < sizeMB * 1024 * 1024;
+    }
+    
+    function isVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // ========== 影片文件 ==========
+    
+    // 影片版本文件
+    match /videos/{videoId}/versions/{versionId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isVideo() && fileSizeUnder(2048);
+      allow update: if isSignedIn() && isVideo() && fileSizeUnder(2048);
+      allow delete: if isSignedIn() || isAdmin();
+    }
+    
+    // 主縮圖
+    match /videos/{videoId}/thumbnail.jpg {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImage() && fileSizeUnder(10);
+    }
+    
+    // 版本縮圖
+    match /videos/{videoId}/versions/{thumbnailFile} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && fileSizeUnder(10);
+    }
+    
+    // 註解圖片
+    match /videos/{videoId}/versions/{versionId}/annotations/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImage() && fileSizeUnder(10);
+    }
+    
+    // ========== 管理員 ==========
+    
+    // match /{allPaths=**} {
+    //   allow read, write: if isAdmin();
+    // }
+    
+    // ========== 預設拒絕 ==========
+    
+    // match /{allPaths=**} {
+    //   allow read, write: if false;
+    // }
   }
 }
