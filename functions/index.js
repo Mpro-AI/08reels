@@ -33,7 +33,7 @@ admin.initializeApp();
 
 // Cloud Function 觸發器：當有檔案上傳到 Cloud Storage 時
 exports.optimizeVideo = functions.runWith({
-  timeoutSeconds: 300, // 增加超時時間以處理影片
+  timeoutSeconds: 360, // 增加超時時間以處理影片
   memory: '1GB'        // 分配更多記憶體
 }).storage.object().onFinalize(async (object) => {
   const fileBucket = object.bucket;
