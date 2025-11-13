@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { addVideo } from '@/firebase/firestore/videos';
 import { useFirestore } from '@/firebase';
-import { Loader2, Image as ImageIcon, Users } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Users, CheckCircle2, AlertCircle } from 'lucide-react';
 import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/firebase/storage';
 import { useStorage } from '@/firebase';
 import { Progress } from '@/components/ui/progress';
@@ -30,6 +30,8 @@ import { getAllEmployees } from '@/firebase/firestore/users';
 import { User } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
+import { optimizeVideoForWeb, getSupportedVideoFormats } from '@/lib/video-optimizer';
+import { Switch } from '@/components/ui/switch';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/avi", "video/webm"];
@@ -42,9 +44,10 @@ const formSchema = z.object({
     .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `檔案大小不能超過 1GB。`)
     .refine(
       files => ACCEPTED_VIDEO_TYPES.includes(files?.[0]?.type),
-      "不支援的檔案格式，僅支援 MP4, MOV, AVI, WEBM。"
+      "不支援的檔案格式,僅支援 MP4, MOV, AVI, WEBM。"
     ),
   assignedUserIds: z.array(z.string()).optional(),
+  optimizeVideo: z.boolean().optional(),
 });
 
 type UploadVideoForm = z.infer<typeof formSchema>;
@@ -57,11 +60,16 @@ interface UploadVideoDialogProps {
 export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
   const [employees, setEmployees] = useState<User[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [optimizeEnabled, setOptimizeEnabled] = useState(false);
+  const [originalFileSize, setOriginalFileSize] = useState<number>(0);
+  const [optimizedFileSize, setOptimizedFileSize] = useState<number>(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const firestore = useFirestore();
@@ -75,8 +83,17 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       notes: '',
       videoFile: undefined,
       assignedUserIds: [],
+      optimizeVideo: false,
     }
   });
+
+  // 檢查瀏覽器是否支援 WebM 轉換
+  const [isWebMSupported, setIsWebMSupported] = useState(false);
+  
+  useEffect(() => {
+    const supported = getSupportedVideoFormats();
+    setIsWebMSupported(supported.some(format => format.includes('webm')));
+  }, []);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -84,7 +101,6 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
         setIsLoadingEmployees(true);
         try {
           const employeeList = await getAllEmployees(firestore);
-          // Exclude current user from the list if they are an employee
           setEmployees(employeeList.filter(e => e.id !== user?.id));
         } catch (error) {
           console.error("Failed to fetch employees:", error);
@@ -102,6 +118,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     if (files && files.length > 0) {
       const file = files[0];
       form.setValue('videoFile', files, { shouldValidate: true });
+      setOriginalFileSize(file.size);
+      setOptimizedFileSize(0);
 
       setThumbnailPreview(null);
       setIsGeneratingThumbnail(true);
@@ -113,7 +131,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
         toast({
           variant: 'destructive',
           title: '縮圖預覽生成失敗',
-          description: '無法從此影片生成預覽，但仍可繼續上傳。',
+          description: '無法從此影片生成預覽,但仍可繼續上傳。',
         });
       } finally {
         setIsGeneratingThumbnail(false);
@@ -121,6 +139,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     } else {
       form.resetField('videoFile');
       setThumbnailPreview(null);
+      setOriginalFileSize(0);
     }
   };
   
@@ -129,9 +148,14 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       form.reset();
       setIsSubmitting(false);
       setUploadProgress(0);
+      setOptimizationProgress(0);
+      setIsOptimizing(false);
       setThumbnailPreview(null);
       setIsGeneratingThumbnail(false);
       setSelectedUserIds([]);
+      setOptimizeEnabled(false);
+      setOriginalFileSize(0);
+      setOptimizedFileSize(0);
     }
   }, [isOpen, form]);
 
@@ -149,7 +173,55 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     setIsSubmitting(true);
     
     try {
-        const videoFile = data.videoFile[0];
+        let videoFile = data.videoFile[0];
+
+        // 如果啟用優化且不是 WebM 格式,則進行轉換
+        if (optimizeEnabled && videoFile.type !== 'video/webm') {
+          setIsOptimizing(true);
+          setOptimizationProgress(0);
+          
+          try {
+            const optimizedBlob = await optimizeVideoForWeb(videoFile, {
+              maxWidth: 1920,
+              maxHeight: 1080,
+              videoBitrate: 2500000,
+              targetFormat: 'webm',
+              codec: 'vp9',
+              onProgress: (progress) => {
+                setOptimizationProgress(progress);
+              }
+            });
+            
+            // 將 Blob 轉換為 File
+            const optimizedFile = new File(
+              [optimizedBlob], 
+              videoFile.name.replace(/\.[^.]+$/, '.webm'),
+              { type: 'video/webm' }
+            );
+            
+            videoFile = optimizedFile;
+            setOptimizedFileSize(optimizedFile.size);
+            
+            // 顯示優化結果
+            const savedPercentage = ((originalFileSize - optimizedFile.size) / originalFileSize * 100).toFixed(1);
+            toast({ 
+              title: '影片優化完成', 
+              description: `已轉換為 WebM 格式,節省 ${savedPercentage}% 空間`,
+            });
+            
+          } catch (optimizationError) {
+            console.error('Video optimization failed:', optimizationError);
+            toast({
+              variant: 'destructive',
+              title: '影片優化失敗',
+              description: '將使用原始檔案上傳',
+            });
+            // 繼續使用原始檔案
+          } finally {
+            setIsOptimizing(false);
+            setOptimizationProgress(0);
+          }
+        }
 
         const { videoUrl, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(
           storage, 
@@ -175,6 +247,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     } finally {
         setIsSubmitting(false);
         setUploadProgress(0);
+        setOptimizationProgress(0);
+        setIsOptimizing(false);
     }
   };
   
@@ -188,6 +262,14 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] h-[90vh] overflow-hidden flex flex-col p-0">
@@ -197,7 +279,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
             <div className="shrink-0 px-6 pt-6 pb-4 border-b">
               <DialogTitle>上傳新專案影片</DialogTitle>
               <DialogDescription className="mt-2">
-                請提供影片標題、選擇檔案，並可選擇性地指派給特定員工。
+                請提供影片標題、選擇檔案,並可選擇性地指派給特定員工。
               </DialogDescription>
             </div>
             
@@ -254,9 +336,52 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                         />
                       </FormControl>
                       <FormMessage />
+                      {originalFileSize > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          原始檔案大小: {formatFileSize(originalFileSize)}
+                        </p>
+                      )}
                     </FormItem>
                   )}
                 />
+
+                {/* 影片優化選項 */}
+                {isWebMSupported && originalFileSize > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-sm font-medium">優化影片</Label>
+                        <p className="text-xs text-muted-foreground">
+                          轉換為 WebM 格式以減少檔案大小並提升串流效能
+                        </p>
+                      </div>
+                      <Switch
+                        checked={optimizeEnabled}
+                        onCheckedChange={setOptimizeEnabled}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    {optimizeEnabled && optimizedFileSize > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>
+                          優化後: {formatFileSize(optimizedFileSize)} 
+                          (節省 {((originalFileSize - optimizedFileSize) / originalFileSize * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isWebMSupported && (
+                  <div className="flex items-start gap-2 p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                    <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <p className="font-medium">影片優化不可用</p>
+                      <p className="text-xs mt-1">您的瀏覽器不支援 WebM 格式轉換</p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* 縮圖預覽 */}
                 {(thumbnailPreview || isGeneratingThumbnail) && (
@@ -283,7 +408,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                   <div className="space-y-2">
                     <Label>指派給用戶 (選填)</Label>
                     <p className="text-sm text-muted-foreground">
-                      選擇可以查看此影片的員工。若不選擇，則所有員工皆可查看。
+                      選擇可以查看此影片的員工。若不選擇,則所有員工皆可查看。
                     </p>
                     {isLoadingEmployees ? (
                       <Skeleton className="h-24 w-full" />
@@ -330,13 +455,26 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                   </div>
                 )}
 
+                {/* 優化進度 */}
+                {isOptimizing && (
+                  <div className="space-y-2">
+                    <Label>
+                      正在優化影片... {optimizationProgress.toFixed(0)}%
+                    </Label>
+                    <Progress value={optimizationProgress} />
+                    <p className="text-xs text-muted-foreground">
+                      正在轉換為 WebM 格式,這可能需要一些時間...
+                    </p>
+                  </div>
+                )}
+
                 {/* 上傳進度 */}
-                {isSubmitting && (
+                {isSubmitting && !isOptimizing && (
                   <div className="space-y-2">
                     <Label>
                       {isUploading 
                         ? `上傳中... ${uploadProgress.toFixed(0)}%` 
-                        : (uploadProgress === 100 ? '上傳完成，處理中...' : '準備上傳...')
+                        : (uploadProgress === 100 ? '上傳完成,處理中...' : '準備上傳...')
                       }
                     </Label>
                     <Progress value={uploadProgress} />
@@ -359,7 +497,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isUploading ? '上傳中' : '處理中'}
+                    {isOptimizing ? '優化中' : (isUploading ? '上傳中' : '處理中')}
                   </>
                 ) : (
                   '提交'
