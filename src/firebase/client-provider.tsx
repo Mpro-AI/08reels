@@ -28,8 +28,8 @@ export function FirebaseClientProvider({
         const auth = getAuth(app);
         const firestore = getFirestore(app);
         
-        // ✅ Using the bucket from the config file.
-        const storage = getStorage(app);
+        // ✅ Explicitly setting the desired bucket to avoid any ambiguity.
+        const storage = getStorage(app, 'gs://reels08team');
         
         console.log('📦 Storage Bucket Initialized:', storage.app.options.storageBucket);
 
