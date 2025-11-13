@@ -7,13 +7,21 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Matches the main project thumbnail.
+    match /videos/{videoId}/thumbnail.jpg {
+      // Allow anyone to read the thumbnail.
+      allow read: if true;
+      // Allow signed-in users to create/update the thumbnail.
+      allow write: if isSignedIn();
+    }
+
     // Matches any video version file.
     match /videos/{videoId}/versions/{versionId}/{fileName} {
       // Allow anyone to read the video files.
       // This is necessary for the video player to work and for AI analysis.
       allow read: if true;
 
-      // Only signed-in users can upload new video versions.
+      // Only signed-in-users can upload new video versions.
       allow write: if isSignedIn();
 
       // Nobody can delete or overwrite a video file once it's uploaded to preserve version history.
