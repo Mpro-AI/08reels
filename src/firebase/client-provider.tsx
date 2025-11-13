@@ -28,7 +28,7 @@ export function FirebaseClientProvider({
         const auth = getAuth(app);
         const firestore = getFirestore(app);
         
-        // ✅ Reverted to use the bucket from the config file.
+        // ✅ Using the bucket from the config file.
         const storage = getStorage(app);
         
         console.log('📦 Storage Bucket Initialized:', storage.app.options.storageBucket);
