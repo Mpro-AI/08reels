@@ -1,6 +1,6 @@
 'use client';
 import { useParams } from 'next/navigation';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, useContext } from 'react';
 import Header from '@/components/header';
 import VideoPlayer from '@/components/video/player';
 import SidePanel from '@/components/video/side-panel';
@@ -15,6 +15,7 @@ import AnnotationCanvas from '@/components/video/annotation-canvas';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
 import TextAnnotationInput from '@/components/video/text-annotation-input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AppLayoutContext } from '@/components/app-layout';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00:00';
@@ -32,6 +33,7 @@ export default function VideoPage() {
   const firestore = useFirestore();
   const storage = useStorage();
   const { user } = useAuth();
+  const { videos: allVideos, loading: videosLoading } = useContext(AppLayoutContext);
   
   const videoRef = useMemo(() => {
     if (!firestore || !videoId) return null;
@@ -61,6 +63,8 @@ export default function VideoPage() {
     width: 1920,
     height: 1080
   });
+
+  const [preloadedUrls, setPreloadedUrls] = useState<Set<string>>(new Set());
   
   const selectedVersion = video?.versions.find(v => v.id === selectedVersionId);
   const currentThumbnail = selectedVersion?.thumbnailUrl || video?.thumbnailUrl;
@@ -92,7 +96,6 @@ export default function VideoPage() {
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     
-    // 如果已經載入
     if (video.videoWidth > 0) {
       handleLoadedMetadata();
     }
@@ -101,6 +104,34 @@ export default function VideoPage() {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, [selectedVersion?.videoUrl]);
+
+  // Intelligent preloading of the next video
+  useEffect(() => {
+    if (!allVideos || allVideos.length < 2 || !videoId) return;
+
+    const currentVideoIndex = allVideos.findIndex(v => v.id === videoId);
+    
+    if (currentVideoIndex !== -1 && currentVideoIndex < allVideos.length - 1) {
+      const nextVideo = allVideos[currentVideoIndex + 1];
+      const nextVideoActiveVersion = nextVideo.versions.find(v => v.isCurrentActive) || nextVideo.versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+      
+      if (nextVideoActiveVersion) {
+          const nextUrl = nextVideoActiveVersion.videoUrl;
+          if (!preloadedUrls.has(nextUrl)) {
+              console.log(`🧠 Preloading next video: ${nextVideo.title}`);
+              const link = document.createElement('link');
+              link.rel = 'prefetch';
+              link.href = nextUrl;
+              link.as = 'video';
+              link.crossOrigin = 'anonymous';
+              document.head.appendChild(link);
+              
+              setPreloadedUrls(prev => new Set(prev).add(nextUrl));
+          }
+      }
+    }
+  }, [allVideos, videoId, preloadedUrls]);
+
 
   const enterAnnotationMode = (mode: AnnotationMode) => {
     if (!isAdmin) return;
@@ -168,7 +199,7 @@ export default function VideoPage() {
     }
 
     setIsUploading(true);
-    setAnnotationMode('select'); // Set mode to select to allow interaction with the new image
+    setAnnotationMode('select');
 
     try {
         const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
@@ -176,7 +207,7 @@ export default function VideoPage() {
         const canvasWidth = videoNaturalSize.width;
         const canvasHeight = videoNaturalSize.height;
         
-        const imageWidth = canvasWidth * 0.2; // 20% of canvas width
+        const imageWidth = canvasWidth * 0.2;
         const tempImage = new Image();
         tempImage.src = URL.createObjectURL(file);
         await new Promise(resolve => tempImage.onload = resolve);
@@ -258,7 +289,7 @@ export default function VideoPage() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
   
-    const fontSize = videoNaturalSize.height * 0.03; // Font size relative to canvas height
+    const fontSize = videoNaturalSize.height * 0.03;
     ctx.font = `${fontSize}px sans-serif`;
     const textMetrics = ctx.measureText(text);
   
@@ -361,7 +392,6 @@ export default function VideoPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
         const target = event.target as HTMLElement;
-        // Don't trigger if user is typing in an input/textarea
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
           return;
         }
@@ -376,7 +406,7 @@ export default function VideoPage() {
     };
   }, []);
   
-  if (loading || !video || !selectedVersion) {
+  if (loading || !video || !selectedVersion || videosLoading) {
     return (
         <>
             <Header title="載入中..." />
