@@ -136,14 +136,20 @@ export async function uploadVideoAndGetUrl(
   let thumbnailUrl = `https://placehold.co/600x400/208279/FFFFFF/png?text=Video`;
   try {
     const thumbnailBlob = await generateVideoThumbnail(file);
-    // If it's a new version, pass the version number to uploadThumbnail
-    thumbnailUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId, versionNumber);
+    // If it's a new video project, upload a main thumbnail.
+    // If it's a new version, upload a version-specific thumbnail.
+    const thumbUrl = await uploadThumbnail(storage, thumbnailBlob, videoProjectId, versionNumber);
+    // Only update the main thumbnail URL if it's the first version.
+    if (!versionNumber || versionNumber === 1) {
+        thumbnailUrl = thumbUrl;
+    }
   } catch (error) {
     console.error('Thumbnail generation failed, using fallback.', error);
   }
 
-  const versionIdForPath = versionNumber ? `v${versionNumber.toString().padStart(2, '0')}` : uuidv4();
-  const storagePath = `gs://reels08team/videos/${videoProjectId}/versions/${versionIdForPath}/${file.name}`;
+  const versionIdForPath = versionNumber ? `v${versionNumber.toString().padStart(2, '0')}` : 'v01';
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `videos/${videoProjectId}/versions/${versionIdForPath}/${cleanFileName}`;
   const storageRef = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);
@@ -190,7 +196,8 @@ export async function uploadAnnotationImage(
   versionId: string,
 ): Promise<string> {
   const annotationImageId = uuidv4();
-  const storagePath = `gs://reels08team/videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${file.name}`;
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${cleanFileName}`;
   const storageRef = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);

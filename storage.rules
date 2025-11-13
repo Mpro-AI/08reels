@@ -13,58 +13,42 @@ service firebase.storage {
       return request.auth.token.admin == true;
     }
     
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
     function fileSizeUnder(sizeMB) {
       return request.resource.size < sizeMB * 1024 * 1024;
-    }
-    
-    function isImage() {
-      return request.resource.contentType.matches('image/.*');
     }
     
     function isVideo() {
       return request.resource.contentType.matches('video/.*');
     }
     
-    // ========== 影片主目錄 ==========
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
     
-    // 影片文件
+    // ========== 影片文件規則 ==========
+    
+    // 影片版本路徑
     match /videos/{videoId}/versions/{versionId}/{fileName} {
-      // 讀取：所有已登入用戶
       allow read: if isSignedIn();
-      
-      // 寫入：已登入用戶 + 影片格式 + 小於 1GB
-      allow write: if isSignedIn() 
-                   && isVideo() 
-                   && fileSizeUnder(1024);
+      allow write: if isSignedIn() && isVideo() && fileSizeUnder(1024);
     }
     
     // 專案主縮圖
     match /videos/{videoId}/thumbnail.jpg {
-      allow read: if true; // Thumbnails are public
-      allow write: if isSignedIn() 
-                   && isImage() 
-                   && fileSizeUnder(5);
+      allow read: if true; // Thumbnails can be public
+      allow write: if isSignedIn() && isImage() && fileSizeUnder(5);
     }
     
     // 版本縮圖
-    match /videos/{videoId}/versions/{versionId}_thumbnail.jpg {
-      allow read: if true; // Thumbnails are public
-      allow write: if isSignedIn() 
-                   && isImage() 
-                   && fileSizeUnder(5);
+    match /videos/{videoId}/versions/v{versionNumber}_thumbnail.jpg {
+        allow read: if true;
+        allow write: if isSignedIn() && isImage() && fileSizeUnder(5);
     }
     
-    // ========== 註解圖片 ==========
-    
-    match /videos/{videoId}/versions/{versionId}/annotations/{imageName} {
+    // 註解圖片
+    match /videos/{videoId}/versions/{versionId}/annotations/{annotationFile} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() 
-                   && isImage() 
-                   && fileSizeUnder(10);
+      allow write: if isSignedIn() && isImage() && fileSizeUnder(10);
     }
   }
 }
