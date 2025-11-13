@@ -143,7 +143,7 @@ export async function uploadVideoAndGetUrl(
   }
 
   const versionIdForPath = versionNumber ? `v${versionNumber.toString().padStart(2, '0')}` : uuidv4();
-  const storagePath = `videos/${videoProjectId}/versions/${versionIdForPath}/${file.name}`;
+  const storagePath = `gs://reels08team/videos/${videoProjectId}/versions/${versionIdForPath}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);
@@ -190,7 +190,7 @@ export async function uploadAnnotationImage(
   versionId: string,
 ): Promise<string> {
   const annotationImageId = uuidv4();
-  const storagePath = `videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${file.name}`;
+  const storagePath = `gs://reels08team/videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${file.name}`;
   const storageRef = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);
