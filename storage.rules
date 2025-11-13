@@ -11,8 +11,14 @@ service firebase.storage {
     match /videos/{videoId}/thumbnail.jpg {
       // Allow anyone to read the thumbnail.
       allow read: if true;
-      // Allow signed-in users to create/update the thumbnail.
+      // Allow any signed-in user to create or update the main project thumbnail.
       allow write: if isSignedIn();
+    }
+    
+    // Matches version-specific thumbnails.
+    match /videos/{videoId}/versions/{versionId}_thumbnail.jpg {
+        allow read: if true;
+        allow write: if isSignedIn();
     }
 
     // Matches any video version file.
