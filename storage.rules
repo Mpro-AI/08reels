@@ -2,46 +2,69 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Helper function to check if a user is signed in.
+    
+    // ========== 輔助函數 ==========
+    
     function isSignedIn() {
       return request.auth != null;
     }
-
-    // Matches the main project thumbnail.
-    match /videos/{videoId}/thumbnail.jpg {
-      // Allow anyone to read the thumbnail.
-      allow read: if true;
-      // Allow any signed-in user to create or update the main project thumbnail.
-      allow write: if isSignedIn();
+    
+    function isAdmin() {
+      return request.auth.token.admin == true;
     }
     
-    // Matches version-specific thumbnails.
-    match /videos/{videoId}/versions/{versionId}_thumbnail.jpg {
-        allow read: if true;
-        allow write: if isSignedIn();
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
-
-    // Matches any video version file.
+    
+    function fileSizeUnder(sizeMB) {
+      return request.resource.size < sizeMB * 1024 * 1024;
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+    
+    // ========== 影片主目錄 ==========
+    
+    // 影片文件
     match /videos/{videoId}/versions/{versionId}/{fileName} {
-      // Allow anyone to read the video files.
-      // This is necessary for the video player to work and for AI analysis.
-      allow read: if true;
-
-      // Only signed-in-users can upload new video versions.
-      allow write: if isSignedIn();
-
-      // Nobody can delete or overwrite a video file once it's uploaded to preserve version history.
-      allow delete: if false;
-      allow update: if false;
+      // 讀取：所有已登入用戶
+      allow read: if isSignedIn();
+      
+      // 寫入：已登入用戶 + 影片格式 + 小於 1GB
+      allow write: if isSignedIn() 
+                   && isVideo() 
+                   && fileSizeUnder(1024);
     }
-
-    // Matches any annotation image file.
+    
+    // 專案主縮圖
+    match /videos/{videoId}/thumbnail.jpg {
+      allow read: if true; // Thumbnails are public
+      allow write: if isSignedIn() 
+                   && isImage() 
+                   && fileSizeUnder(5);
+    }
+    
+    // 版本縮圖
+    match /videos/{videoId}/versions/{versionId}_thumbnail.jpg {
+      allow read: if true; // Thumbnails are public
+      allow write: if isSignedIn() 
+                   && isImage() 
+                   && fileSizeUnder(5);
+    }
+    
+    // ========== 註解圖片 ==========
+    
     match /videos/{videoId}/versions/{versionId}/annotations/{imageName} {
-      // Anyone can read annotation images.
-      allow read: if true;
-
-      // Only signed-in users can upload annotation images.
-      allow write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() 
+                   && isImage() 
+                   && fileSizeUnder(10);
     }
   }
 }
