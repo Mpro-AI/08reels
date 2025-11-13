@@ -109,7 +109,11 @@ export async function uploadThumbnail(
     
   const thumbnailRef = ref(storage, thumbnailPath);
   
-  await uploadBytes(thumbnailRef, thumbnailBlob);
+  const metadata = {
+    contentType: 'image/jpeg',
+    cacheControl: 'public, max-age=31536000', // Cache for 1 year
+  };
+  await uploadBytes(thumbnailRef, thumbnailBlob, metadata);
   return getDownloadURL(thumbnailRef);
 }
 
@@ -152,7 +156,12 @@ export async function uploadVideoAndGetUrl(
   const storagePath = `videos/${videoProjectId}/versions/${versionIdForPath}/${cleanFileName}`;
   const storageRef = ref(storage, storagePath);
 
-  const uploadTask = uploadBytesResumable(storageRef, file);
+  const metadata = {
+    contentType: file.type,
+    cacheControl: 'public, max-age=31536000', // Cache for 1 year
+  };
+
+  const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
   return new Promise((resolve, reject) => {
     uploadTask.on(
@@ -200,7 +209,11 @@ export async function uploadAnnotationImage(
   const storagePath = `videos/${videoId}/versions/${versionId}/annotations/${annotationImageId}-${cleanFileName}`;
   const storageRef = ref(storage, storagePath);
 
-  const uploadTask = uploadBytesResumable(storageRef, file);
+  const metadata = {
+    contentType: file.type,
+    cacheControl: 'public, max-age=31536000', // Cache for 1 year
+  };
+  const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
   return new Promise((resolve, reject) => {
     uploadTask.on(
