@@ -404,7 +404,7 @@ export default function VideoPage() {
         <Header title={video.title} />
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
             <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex items-center justify-center">
-              <div className="relative w-full max-w-5xl mx-auto" style={{ aspectRatio: '16/9' }}>
+              <div className="relative w-full max-w-5xl mx-auto">
                 <VideoPlayer 
                   src={selectedVersion.videoUrl} 
                   poster={currentThumbnail}
