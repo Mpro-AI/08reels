@@ -3,52 +3,17 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // ========== 輔助函數 ==========
-    
+    // ========== Helper Functions ==========
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isAdmin() {
-      return request.auth.token.admin == true;
-    }
-    
-    function fileSizeUnder(sizeMB) {
-      return request.resource.size < sizeMB * 1024 * 1024;
-    }
-    
-    function isVideo() {
-      return request.resource.contentType.matches('video/.*');
-    }
-    
-    function isImage() {
-      return request.resource.contentType.matches('image/.*');
-    }
-    
-    // ========== 影片文件規則 ==========
-    
-    // 影片版本路徑
-    match /videos/{videoId}/versions/{versionId}/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isVideo() && fileSizeUnder(1024);
-    }
-    
-    // 專案主縮圖
-    match /videos/{videoId}/thumbnail.jpg {
-      allow read: if true; // Thumbnails can be public
-      allow write: if isSignedIn() && isImage() && fileSizeUnder(5);
-    }
-    
-    // 版本縮圖
-    match /videos/{videoId}/versions/v{versionNumber}_thumbnail.jpg {
-        allow read: if true;
-        allow write: if isSignedIn() && isImage() && fileSizeUnder(5);
-    }
-    
-    // 註解圖片
-    match /videos/{videoId}/versions/{versionId}/annotations/{annotationFile} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isImage() && fileSizeUnder(10);
+
+    // ========== Main Rule for Videos ==========
+    // Allow any signed-in user to read and write anything inside the /videos folder.
+    // This is a broad rule for debugging and ensuring functionality.
+    // It covers main thumbnails, version thumbnails, video files, and annotations.
+    match /videos/{videoId}/{allPaths=**} {
+      allow read, write: if isSignedIn();
     }
   }
 }
