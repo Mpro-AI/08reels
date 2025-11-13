@@ -109,11 +109,15 @@ export default function VideoPlayer({ src, poster, videoRef, isPaused, qualities
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      setProgress((video.currentTime / video.duration) * 100 || 0);
+      if (video.duration && isFinite(video.duration)) {
+        setProgress((video.currentTime / video.duration) * 100);
+      } else {
+        setProgress(0);
+      }
     };
 
     const handleProgress = () => {
-      if (video.buffered.length > 0) {
+      if (video.buffered.length > 0 && video.duration && isFinite(video.duration)) {
         const bufferedEnd = video.buffered.end(video.buffered.length - 1);
         const buffered = (bufferedEnd / video.duration) * 100;
         setBufferedPercentage(buffered);
