@@ -95,9 +95,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AppLayoutContext.Provider value={{ videos: filteredVideos, setVideos, loading: videosLoading }}>
       <SidebarProvider>
         <Sidebar side="left" collapsible="icon" className="border-r">
-          <SidebarHeader className="items-center justify-center gap-2 p-4 text-primary group-data-[collapsible=icon]:justify-center">
+          <SidebarHeader>
+            <Link href="/" className="flex items-center justify-center gap-2 p-2 text-primary group-data-[collapsible=icon]:justify-center">
               <Icons.logo className="size-6 shrink-0"/>
               <span className="text-lg font-bold group-data-[collapsible=icon]:hidden">Reels 08</span>
+            </Link>
           </SidebarHeader>
           <SidebarContent>
               <SidebarMenu>
