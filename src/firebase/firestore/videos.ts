@@ -9,7 +9,9 @@ import {
   runTransaction,
   collection,
   writeBatch,
+  deleteDoc,
 } from 'firebase/firestore';
+import { FirebaseStorage, ref, listAll, deleteObject } from 'firebase/storage';
 import type { Video, Comment, VersionStatus, User, Version, Annotation } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -46,21 +48,39 @@ export function updateVideoAssignedUsers(
     });
 }
 
-export function deleteVideo(
+export async function deleteVideo(
     db: Firestore,
+    storage: FirebaseStorage,
     videoId: string
 ) {
+    // 1. Delete all files from Firebase Storage
+    const videoFolderRef = ref(storage, `videos/${videoId}`);
+    try {
+        const res = await listAll(videoFolderRef);
+        const deletePromises = res.items.map((itemRef) => deleteObject(itemRef));
+        // Recursively delete subfolders (versions)
+        for (const folderRef of res.prefixes) {
+            const subFolderRes = await listAll(folderRef);
+            subFolderRes.items.forEach((itemRef) => deletePromises.push(deleteObject(itemRef)));
+        }
+        await Promise.all(deletePromises);
+        console.log(`Successfully deleted all files for video ${videoId} from storage.`);
+    } catch (error) {
+        console.error(`Failed to delete files from storage for video ${videoId}:`, error);
+        // We will still proceed to delete the Firestore doc, but we log the error.
+        // In a real-world app, you might want more robust error handling here.
+    }
+
+    // 2. Delete the document from Firestore
     const videoRef = doc(db, 'videos', videoId);
-    updateDoc(videoRef, { 
-      isDeleted: true,
-      deletedAt: Timestamp.now().toDate().toISOString()
-    }).catch((e) => {
+    deleteDoc(videoRef).catch((e) => {
         const permissionError = new FirestorePermissionError({
             path: videoRef.path,
-            operation: 'update',
-            requestResourceData: { isDeleted: true },
+            operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
+        // Re-throw the error if you want the caller to handle it
+        throw e;
     });
 }
 
@@ -380,4 +400,3 @@ export async function addNewVersion(
     }
   }
   
-

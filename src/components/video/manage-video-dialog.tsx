@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useStorage } from '@/firebase';
 import { Loader2, Users, Trash2 } from 'lucide-react';
 import { User, Video } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
@@ -50,6 +50,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(video.assignedUserIds || []);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { user: currentUser } = useAuth();
   
   const employees = allUsers.filter(u => u.role === 'employee' && u.id !== video.author.id);
@@ -100,10 +101,10 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   }
   
   const handleDeleteVideo = async () => {
-    if (!firestore) return;
+    if (!firestore || !storage) return;
     setIsSubmitting(true);
     try {
-        await deleteVideo(firestore, video.id);
+        await deleteVideo(firestore, storage, video.id);
         toast({ title: '成功', description: '影片專案已刪除。' });
         onVideoDeleted(video.id);
         handleClose();
@@ -188,7 +189,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
                         <AlertDialogHeader>
                             <AlertDialogTitle>確定要刪除此專案嗎？</AlertDialogTitle>
                             <AlertDialogDescription>
-                                這個操作無法復原。這將會把專案標記為已刪除，並從所有列表中隱藏。
+                                這個操作無法復原。這將會永久刪除此專案，包含所有版本的影片、留言、與註解。
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
