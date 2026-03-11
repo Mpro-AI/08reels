@@ -25,42 +25,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
 
-    // Check if user already exists in users table
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .single();
+    try {
+      // Check if user already exists in users table
+      const { data: existingUser, error: selectError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
 
-    if (existingUser) {
+      if (selectError && selectError.code !== 'PGRST116') {
+        // PGRST116 = no rows found (expected for new users), other errors are real
+        console.error('[upsertUserProfile] select error:', selectError);
+      }
+
+      if (existingUser) {
+        return {
+          id: existingUser.id,
+          name: existingUser.name || supabaseUser.email?.split('@')[0] || 'Anonymous',
+          email: existingUser.email || supabaseUser.email,
+          photoURL: existingUser.photo_url,
+          role: existingUser.role === 'admin' ? 'admin' : 'employee',
+        };
+      } else {
+        // New user — default to employee role
+        const appUser: User = {
+          id: supabaseUser.id,
+          name: supabaseUser.email?.split('@')[0] || 'Anonymous',
+          email: supabaseUser.email,
+          photoURL: null,
+          role: 'employee',
+        };
+
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: supabaseUser.id,
+            name: appUser.name,
+            email: appUser.email,
+            photo_url: appUser.photoURL,
+            role: appUser.role,
+          });
+
+        if (insertError) {
+          console.error('[upsertUserProfile] insert error:', insertError);
+        }
+
+        return appUser;
+      }
+    } catch (err) {
+      console.error('[upsertUserProfile] unexpected error:', err);
+      // Return a minimal user object from the Supabase auth data so auth still works
       return {
-        id: existingUser.id,
-        name: existingUser.name || supabaseUser.email?.split('@')[0] || 'Anonymous',
-        email: existingUser.email || supabaseUser.email,
-        photoURL: existingUser.photo_url,
-        role: existingUser.role === 'admin' ? 'admin' : 'employee',
-      };
-    } else {
-      // New user — default to employee role
-      const appUser: User = {
         id: supabaseUser.id,
         name: supabaseUser.email?.split('@')[0] || 'Anonymous',
         email: supabaseUser.email,
         photoURL: null,
         role: 'employee',
       };
-
-      await supabase
-        .from('users')
-        .insert({
-          id: supabaseUser.id,
-          name: appUser.name,
-          email: appUser.email,
-          photo_url: appUser.photoURL,
-          role: appUser.role,
-        });
-
-      return appUser;
     }
   }, [supabase]);
 
@@ -69,13 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Do NOT call getSession() separately — it causes auth lock conflicts on refresh.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        if (session?.user) {
-          const appUser = await upsertUserProfile(session.user);
-          setUser(appUser);
-        } else {
+        try {
+          if (session?.user) {
+            const appUser = await upsertUserProfile(session.user);
+            setUser(appUser);
+          } else {
+            setUser(null);
+          }
+        } catch (err) {
+          console.error('[onAuthStateChange] error:', err);
           setUser(null);
+        } finally {
+          // ALWAYS clear loading — no matter what happens above
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
