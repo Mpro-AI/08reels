@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
 import { useSupabase } from '@/supabase';
@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const supabase = useSupabase();
-  const mountedRef = useRef(true);
 
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
@@ -72,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('[upsertUserProfile] unexpected error:', err);
+      // Fallback: return minimal user from auth data so app still works
       return {
         id: supabaseUser.id,
         name: supabaseUser.email?.split('@')[0] || 'Anonymous',
@@ -83,40 +83,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    mountedRef.current = true;
+    let mounted = true;
 
-    // === HARD TIMEOUT: loading MUST clear within 5s no matter what ===
+    // Safety net: if auth hasn't resolved after 8s, force loading off
     const timeout = setTimeout(() => {
-      if (mountedRef.current) {
-        console.warn('[auth] 5s timeout — forcing loading off');
+      if (mounted) {
+        console.warn('[auth] 8s timeout — forcing loading off');
         setLoading(false);
       }
-    }, 5000);
+    }, 8000);
 
-    // === SINGLE SOURCE OF TRUTH: onAuthStateChange handles everything ===
-    // Do NOT call getSession() separately — it triggers Supabase internal
-    // token refresh which holds the auth lock, blocking subsequent
-    // signInWithPassword calls and causing "Processing..." to hang forever.
+    // IMPORTANT: Do NOT call getSession() here — it competes with
+    // signInWithPassword() for the Supabase auth lock and causes login to hang.
+    // onAuthStateChange fires INITIAL_SESSION on mount, which handles the
+    // refresh case (reads cached session from localStorage).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!mounted) return;
         try {
           if (session?.user) {
             const appUser = await upsertUserProfile(session.user);
-            if (mountedRef.current) setUser(appUser);
+            if (mounted) setUser(appUser);
           } else {
-            if (mountedRef.current) setUser(null);
+            if (mounted) setUser(null);
           }
         } catch (err) {
           console.error('[onAuthStateChange] error:', err);
-          if (mountedRef.current) setUser(null);
+          if (mounted) setUser(null);
         } finally {
-          if (mountedRef.current) setLoading(false);
+          // ALWAYS clear loading — no matter what happens above
+          if (mounted) {
+            setLoading(false);
+            clearTimeout(timeout);
+          }
         }
       }
     );
 
     return () => {
-      mountedRef.current = false;
+      mounted = false;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
@@ -127,23 +132,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     try {
-      // Race signInWithPassword against a 10s timeout.
-      // If the Supabase auth lock is stuck, the timeout prevents eternal "Processing..."
-      const result = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), 10000)
-        ),
-      ]);
-      if (result.error) throw result.error;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       toast({ title: '登入成功' });
       return true;
     } catch (error: any) {
       console.error("Email sign-in failed", error);
       let description = '發生未知錯誤，請稍後再試。';
-      if (error.message === 'LOGIN_TIMEOUT') {
-        description = '登入逾時，請重新整理頁面後再試。';
-      } else if (error.message?.includes('Invalid login credentials')) {
+      if (error.message?.includes('Invalid login credentials')) {
         description = '電子郵件或密碼不正確。';
       }
       toast({ variant: 'destructive', title: '登入失敗', description });
