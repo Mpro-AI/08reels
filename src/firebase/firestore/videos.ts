@@ -48,51 +48,84 @@ export function updateVideoAssignedUsers(
     });
 }
 
+/**
+ * 遞迴刪除 Storage 資料夾中的所有檔案和子資料夾
+ * @param storage Firebase Storage 實例
+ * @param folderPath 資料夾路徑
+ */
+async function deleteStorageFolderRecursive(
+    storage: FirebaseStorage,
+    folderPath: string
+): Promise<void> {
+    const folderRef = ref(storage, folderPath);
+
+    try {
+        const res = await listAll(folderRef);
+
+        // 刪除所有檔案
+        const deleteFilePromises = res.items.map((itemRef) => {
+            console.log(`刪除檔案: ${itemRef.fullPath}`);
+            return deleteObject(itemRef);
+        });
+
+        // 遞迴刪除所有子資料夾
+        const deleteFolderPromises = res.prefixes.map((prefixRef) => {
+            console.log(`遞迴刪除資料夾: ${prefixRef.fullPath}`);
+            return deleteStorageFolderRecursive(storage, prefixRef.fullPath);
+        });
+
+        // 等待所有刪除操作完成
+        await Promise.all([...deleteFilePromises, ...deleteFolderPromises]);
+
+    } catch (error) {
+        console.error(`刪除資料夾 ${folderPath} 時發生錯誤:`, error);
+        throw error;
+    }
+}
+
 export async function deleteVideo(
     db: Firestore,
     storage: FirebaseStorage,
     videoId: string
 ) {
-    // 1. Delete all files from Firebase Storage
-    const videoFolderRef = ref(storage, `videos/${videoId}`);
+    // 1. 遞迴刪除 Firebase Storage 中的整個專案資料夾
+    const videoFolderPath = `videos/${videoId}`;
     try {
-        const res = await listAll(videoFolderRef);
-        const deletePromises = res.items.map((itemRef) => deleteObject(itemRef));
-        // Recursively delete subfolders (versions)
-        for (const folderRef of res.prefixes) {
-            const subFolderRes = await listAll(folderRef);
-            subFolderRes.items.forEach((itemRef) => deletePromises.push(deleteObject(itemRef)));
-        }
-        await Promise.all(deletePromises);
-        console.log(`Successfully deleted all files for video ${videoId} from storage.`);
+        console.log(`開始刪除專案資料夾: ${videoFolderPath}`);
+        await deleteStorageFolderRecursive(storage, videoFolderPath);
+        console.log(`成功刪除專案 ${videoId} 的所有檔案`);
     } catch (error) {
-        console.error(`Failed to delete files from storage for video ${videoId}:`, error);
-        // We will still proceed to delete the Firestore doc, but we log the error.
-        // In a real-world app, you might want more robust error handling here.
+        console.error(`刪除專案 ${videoId} 的檔案時失敗:`, error);
+        // 即使 Storage 刪除失敗,仍繼續刪除 Firestore 文檔
+        // 在實際應用中,您可能需要更完善的錯誤處理
     }
 
-    // 2. Delete the document from Firestore
+    // 2. 刪除 Firestore 中的文檔
     const videoRef = doc(db, 'videos', videoId);
-    deleteDoc(videoRef).catch((e) => {
+    try {
+        await deleteDoc(videoRef);
+        console.log(`成功刪除專案 ${videoId} 的 Firestore 文檔`);
+    } catch (e) {
+        console.error(`刪除專案 ${videoId} 的 Firestore 文檔時失敗:`, e);
         const permissionError = new FirestorePermissionError({
             path: videoRef.path,
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
-        // Re-throw the error if you want the caller to handle it
+        // 重新拋出錯誤讓呼叫者處理
         throw e;
-    });
+    }
 }
 
 
-export function addAnnotationsToVersion(
+export async function addAnnotationsToVersion(
   db: Firestore,
   videoId: string,
   versionId: string,
   annotations: Omit<Annotation, 'id'>[],
 ) {
     const videoRef = doc(db, 'videos', videoId);
-    runTransaction(db, async (transaction) => {
+    return runTransaction(db, async (transaction) => {
         const videoDoc = await transaction.get(videoRef);
         if (!videoDoc.exists()) {
             throw 'Video does not exist!';
@@ -103,7 +136,7 @@ export function addAnnotationsToVersion(
         if (versionIndex === -1) {
             throw 'Version does not exist!';
         }
-        
+
         const newAnnotationsWithIds: Annotation[] = annotations.map(anno => ({
             ...anno,
             id: doc(collection(db, 'dummy')).id,
@@ -116,25 +149,17 @@ export function addAnnotationsToVersion(
         newVersions[versionIndex].annotations.push(...newAnnotationsWithIds);
 
         transaction.update(videoRef, { versions: newVersions });
-    }).catch((e) => {
-        console.error("Transaction failed: ", e);
-        const permissionError = new FirestorePermissionError({
-            path: videoRef.path,
-            operation: 'update',
-            requestResourceData: { annotations },
-        });
-        errorEmitter.emit('permission-error', permissionError);
     });
 }
 
-export function updateAnnotationInVersion(
+export async function updateAnnotationInVersion(
     db: Firestore,
     videoId: string,
     versionId: string,
     updatedAnnotation: Annotation,
 ) {
     const videoRef = doc(db, 'videos', videoId);
-    runTransaction(db, async (transaction) => {
+    return runTransaction(db, async (transaction) => {
         const videoDoc = await transaction.get(videoRef);
         if (!videoDoc.exists()) {
             throw 'Video does not exist!';
@@ -151,18 +176,10 @@ export function updateAnnotationInVersion(
         if (annotationIndex === -1) {
             throw 'Annotation does not exist!';
         }
-        
+
         newVersions[versionIndex].annotations[annotationIndex] = updatedAnnotation;
 
         transaction.update(videoRef, { versions: newVersions });
-    }).catch((e) => {
-        console.error("Transaction for updating annotation failed: ", e);
-        const permissionError = new FirestorePermissionError({
-            path: videoRef.path,
-            operation: 'update',
-            requestResourceData: { updatedAnnotation },
-        });
-        errorEmitter.emit('permission-error', permissionError);
     });
 }
 

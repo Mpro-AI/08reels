@@ -9,7 +9,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return request.auth.token.admin == true;
+      // 檢查 Firebase Auth custom claim 或 Firestore 用戶文檔的 role
+      return request.auth.token.admin == true ||
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // ========== Collections ==========
@@ -26,7 +28,7 @@ service cloud.firestore {
     // Updates are allowed only by the video's author.
     match /videos/{videoId} {
       allow get, list: if isAdmin() || isSignedIn();
-      
+
       allow create: if isAdmin() || (isSignedIn()
                     && request.resource.data.author.id == request.auth.uid
                     && request.resource.data.title is string
@@ -50,7 +52,7 @@ service cloud.firestore {
           request.resource.data.uploadedAt == resource.data.uploadedAt
         )
       ));
-      
+
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.author.id);
     }
   }

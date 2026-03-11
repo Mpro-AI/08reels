@@ -43,26 +43,28 @@ export default function SidePanel({
     if (!firestore || !user || !isAdmin) return;
     const player = document.querySelector('video');
     const currentTime = player ? player.currentTime : 0;
-    
+
     addCommentToVersion(
       firestore,
       video.id,
       selectedVersion.id,
       {
         text: commentText,
-        timecode: Math.floor(currentTime),
+        timecode: currentTime, // 保留完整的小數點精度
         timecodeFormatted: formatTime(currentTime),
       },
       { id: user.id, name: user.name },
     );
   };
 
+  // 格式化時間為 hh:mm:ss.ms
   const formatTime = (seconds: number): string => {
-    if (isNaN(seconds)) return '00:00:00';
+    if (isNaN(seconds)) return '00:00:00.000';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${[h, m, s].map(v => v.toString().padStart(2, '0')).join(':')}.${ms.toString().padStart(3, '0')}`;
   }
 
   return (
@@ -100,6 +102,7 @@ export default function SidePanel({
                   onVersionChange={onVersionChange}
                   onStatusChange={onVersionStatusChange}
                   onNewVersionUploaded={onNewVersionUploaded}
+                  onCommentClick={onTimecodeClick}
                 />
             </TabsContent>
         </div>

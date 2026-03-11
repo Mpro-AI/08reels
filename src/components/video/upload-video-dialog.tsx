@@ -30,8 +30,10 @@ import { getAllEmployees } from '@/firebase/firestore/users';
 import { User } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
-import { optimizeVideoForWeb, getSupportedVideoFormats } from '@/lib/video-optimizer';
+import { getSupportedVideoFormats, checkVideoStreamingOptimization } from '@/lib/video-optimizer';
+import { optimizeVideoWithFFmpeg, loadFFmpeg, isFFmpegLoaded } from '@/lib/ffmpeg-optimizer';
 import { Switch } from '@/components/ui/switch';
+import { Info } from 'lucide-react';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/avi", "video/webm"];
@@ -70,6 +72,15 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
   const [optimizeEnabled, setOptimizeEnabled] = useState(false);
   const [originalFileSize, setOriginalFileSize] = useState<number>(0);
   const [optimizedFileSize, setOptimizedFileSize] = useState<number>(0);
+  const [videoAnalysis, setVideoAnalysis] = useState<{
+    isOptimized: boolean;
+    format: string;
+    duration: number;
+    width: number;
+    height: number;
+    recommendations: string[];
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const firestore = useFirestore();
@@ -87,13 +98,28 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     }
   });
 
-  // 檢查瀏覽器是否支援 WebM 轉換
-  const [isWebMSupported, setIsWebMSupported] = useState(false);
-  
+  // FFmpeg 優化支援狀態
+  const [isFFmpegSupported, setIsFFmpegSupported] = useState(true); // FFmpeg.wasm 支援大多數瀏覽器
+  const [isLoadingFFmpeg, setIsLoadingFFmpeg] = useState(false);
+  const [ffmpegLog, setFfmpegLog] = useState<string>('');
+
+  // 預載 FFmpeg - 僅在對話框打開且優化功能啟用時載入
   useEffect(() => {
-    const supported = getSupportedVideoFormats();
-    setIsWebMSupported(supported.some(format => format.includes('webm')));
-  }, []);
+    if (isOpen && optimizeEnabled && typeof window !== 'undefined' && !isFFmpegLoaded()) {
+      setIsLoadingFFmpeg(true);
+      loadFFmpeg().catch((error) => {
+        console.error('FFmpeg 載入失敗:', error);
+        setIsFFmpegSupported(false);
+        toast({
+          variant: 'destructive',
+          title: 'FFmpeg 載入失敗',
+          description: '無法載入影片優化功能，請使用未優化上傳。'
+        });
+      }).finally(() => {
+        setIsLoadingFFmpeg(false);
+      });
+    }
+  }, [isOpen, optimizeEnabled, toast]);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -120,6 +146,23 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       form.setValue('videoFile', files, { shouldValidate: true });
       setOriginalFileSize(file.size);
       setOptimizedFileSize(0);
+      setVideoAnalysis(null);
+
+      // 分析影片
+      setIsAnalyzing(true);
+      try {
+        const analysis = await checkVideoStreamingOptimization(file);
+        setVideoAnalysis(analysis);
+
+        // 如果影片位元率過高,自動建議優化
+        if (analysis.recommendations.length > 0 && isFFmpegSupported) {
+          setOptimizeEnabled(true);
+        }
+      } catch (error) {
+        console.error("Video analysis failed:", error);
+      } finally {
+        setIsAnalyzing(false);
+      }
 
       setThumbnailPreview(null);
       setIsGeneratingThumbnail(true);
@@ -140,6 +183,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       form.resetField('videoFile');
       setThumbnailPreview(null);
       setOriginalFileSize(0);
+      setVideoAnalysis(null);
     }
   };
   
@@ -156,6 +200,9 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       setOptimizeEnabled(false);
       setOriginalFileSize(0);
       setOptimizedFileSize(0);
+      setVideoAnalysis(null);
+      setIsAnalyzing(false);
+      setFfmpegLog('');
     }
   }, [isOpen, form]);
 
@@ -175,51 +222,58 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
     try {
         let videoFile = data.videoFile[0];
 
-        // 如果啟用優化且不是 WebM 格式,則進行轉換
-        if (optimizeEnabled && videoFile.type !== 'video/webm') {
+        // 如果啟用優化,使用 FFmpeg 轉換為串流友好的 MP4
+        if (optimizeEnabled) {
           setIsOptimizing(true);
           setOptimizationProgress(0);
-          
+          setFfmpegLog('');
+
           try {
-            const optimizedBlob = await optimizeVideoForWeb(videoFile, {
+            const optimizedBlob = await optimizeVideoWithFFmpeg(videoFile, {
               maxWidth: 1920,
               maxHeight: 1080,
-              videoBitrate: 2500000,
-              targetFormat: 'webm',
-              codec: 'vp9',
+              videoBitrate: '2.5M',
+              audioBitrate: '128k',
+              preset: 'fast',
+              crf: 23,
               onProgress: (progress) => {
                 setOptimizationProgress(progress);
+              },
+              onLog: (message) => {
+                setFfmpegLog(message);
               }
             });
-            
+
             // 將 Blob 轉換為 File
             const optimizedFile = new File(
-              [optimizedBlob], 
-              videoFile.name.replace(/\.[^.]+$/, '.webm'),
-              { type: 'video/webm' }
+              [optimizedBlob],
+              videoFile.name.replace(/\.[^.]+$/, '_optimized.mp4'),
+              { type: 'video/mp4' }
             );
-            
+
             videoFile = optimizedFile;
             setOptimizedFileSize(optimizedFile.size);
-            
+
             // 顯示優化結果
             const savedPercentage = ((originalFileSize - optimizedFile.size) / originalFileSize * 100).toFixed(1);
-            toast({ 
-              title: '影片優化完成', 
-              description: `已轉換為 WebM 格式,節省 ${savedPercentage}% 空間`,
+            const savedSize = formatFileSize(originalFileSize - optimizedFile.size);
+            toast({
+              title: '影片優化完成',
+              description: `已優化為串流格式 (faststart),${savedPercentage.startsWith('-') ? '增加' : '節省'} ${savedPercentage.replace('-', '')}% (${savedSize})`,
             });
-            
+
           } catch (optimizationError) {
             console.error('Video optimization failed:', optimizationError);
             toast({
               variant: 'destructive',
               title: '影片優化失敗',
-              description: '將使用原始檔案上傳',
+              description: optimizationError instanceof Error ? optimizationError.message : '將使用原始檔案上傳',
             });
             // 繼續使用原始檔案
           } finally {
             setIsOptimizing(false);
             setOptimizationProgress(0);
+            setFfmpegLog('');
           }
         }
 
@@ -345,14 +399,60 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                   )}
                 />
 
+                {/* 影片分析結果 */}
+                {isAnalyzing && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    分析影片中...
+                  </div>
+                )}
+
+                {videoAnalysis && (
+                  <div className="space-y-2">
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium">影片資訊</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <div>解析度: {videoAnalysis.width}x{videoAnalysis.height}</div>
+                        <div>時長: {Math.floor(videoAnalysis.duration / 60)}:{Math.floor(videoAnalysis.duration % 60).toString().padStart(2, '0')}</div>
+                        <div>格式: {videoAnalysis.format.split('/')[1]?.toUpperCase()}</div>
+                        <div>位元率: {((originalFileSize * 8) / videoAnalysis.duration / 1000000).toFixed(1)} Mbps</div>
+                      </div>
+                    </div>
+
+                    {videoAnalysis.recommendations.length > 0 && (
+                      <div className="p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                          <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">優化建議</span>
+                        </div>
+                        <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
+                          {videoAnalysis.recommendations.map((rec, idx) => (
+                            <li key={idx}>• {rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {videoAnalysis.isOptimized && (
+                      <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        影片格式已適合串流播放
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 影片優化選項 */}
-                {isWebMSupported && originalFileSize > 0 && (
+                {isFFmpegSupported && originalFileSize > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
                       <div className="flex-1 space-y-1">
-                        <Label className="text-sm font-medium">優化影片</Label>
+                        <Label className="text-sm font-medium">優化影片 (推薦)</Label>
                         <p className="text-xs text-muted-foreground">
-                          轉換為 WebM 格式以減少檔案大小並提升串流效能
+                          轉換為串流優化 MP4 格式,加入 faststart 標記以加快載入速度
                         </p>
                       </div>
                       <Switch
@@ -365,20 +465,22 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                       <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>
-                          優化後: {formatFileSize(optimizedFileSize)} 
-                          (節省 {((originalFileSize - optimizedFileSize) / originalFileSize * 100).toFixed(1)}%)
+                          優化後: {formatFileSize(optimizedFileSize)}
+                          {originalFileSize > optimizedFileSize
+                            ? ` (節省 ${((originalFileSize - optimizedFileSize) / originalFileSize * 100).toFixed(1)}%)`
+                            : ''}
                         </span>
                       </div>
                     )}
                   </div>
                 )}
 
-                {!isWebMSupported && (
+                {!isFFmpegSupported && (
                   <div className="flex items-start gap-2 p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
                     <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
                     <div className="text-sm text-yellow-800 dark:text-yellow-200">
                       <p className="font-medium">影片優化不可用</p>
-                      <p className="text-xs mt-1">您的瀏覽器不支援 WebM 格式轉換</p>
+                      <p className="text-xs mt-1">您的瀏覽器不支援 FFmpeg,建議使用 Chrome 或 Firefox</p>
                     </div>
                   </div>
                 )}
@@ -463,7 +565,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
                     </Label>
                     <Progress value={optimizationProgress} />
                     <p className="text-xs text-muted-foreground">
-                      正在轉換為 WebM 格式,這可能需要一些時間...
+                      {ffmpegLog || '正在使用 FFmpeg 轉換為串流優化格式,這可能需要一些時間...'}
                     </p>
                   </div>
                 )}

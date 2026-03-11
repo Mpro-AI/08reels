@@ -9,6 +9,49 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * 驗證視頻 URL 是否支持 Range requests
+ * @param url 視頻 URL
+ * @returns Promise<boolean> 是否支持 Range requests
+ */
+export async function verifyRangeSupport(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        'Range': 'bytes=0-0',
+      },
+    });
+
+    const acceptRanges = response.headers.get('Accept-Ranges');
+    const contentRange = response.headers.get('Content-Range');
+    const contentType = response.headers.get('Content-Type');
+
+    console.log('📊 Range Support 檢查:');
+    console.log('  - Accept-Ranges:', acceptRanges);
+    console.log('  - Content-Range:', contentRange);
+    console.log('  - Content-Type:', contentType);
+    console.log('  - Status:', response.status);
+
+    // Firebase Storage 應該返回 206 Partial Content 且 Accept-Ranges: bytes
+    const supportsRange = (
+      (response.status === 206 || acceptRanges === 'bytes') &&
+      contentType?.startsWith('video/')
+    );
+
+    if (supportsRange) {
+      console.log('✅ Range requests 支持正常');
+    } else {
+      console.warn('⚠️ Range requests 可能不支持');
+    }
+
+    return supportsRange;
+  } catch (error) {
+    console.error('❌ Range Support 檢查失敗:', error);
+    return false;
+  }
+}
+
+/**
  * Generates a thumbnail from a video file.
  * @param videoFile The video file.
  * @param maxWidth The maximum width of the thumbnail.
@@ -156,9 +199,30 @@ export async function uploadVideoAndGetUrl(
   const storagePath = `videos/${videoProjectId}/versions/${versionIdForPath}/${cleanFileName}`;
   const storageRef = ref(storage, storagePath);
 
+  // 根據文件擴展名確定正確的 Content-Type
+  // 這比依賴 file.type 更可靠，因為瀏覽器可能不正確識別
+  const getVideoContentType = (filename: string): string => {
+    const ext = filename.toLowerCase().split('.').pop();
+    const mimeTypes: { [key: string]: string } = {
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'mov': 'video/quicktime',
+      'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska',
+      'm4v': 'video/x-m4v',
+    };
+    return mimeTypes[ext || ''] || file.type || 'video/mp4';
+  };
+
   const metadata = {
-    contentType: file.type,
+    contentType: getVideoContentType(file.name),
     cacheControl: 'public, max-age=31536000', // Cache for 1 year
+    // Firebase Storage 默認支持 Range requests，無需額外設置
+    // 但確保不會被覆蓋
+    customMetadata: {
+      originalFileName: file.name,
+      uploadedAt: new Date().toISOString(),
+    },
   };
 
   const uploadTask = uploadBytesResumable(storageRef, file, metadata);
@@ -179,6 +243,13 @@ export async function uploadVideoAndGetUrl(
         onProgress(100);
         try {
           const videoUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+          // 驗證視頻 URL 是否支持 Range requests（開發/調試用）
+          console.log('📹 視頻上傳完成，驗證 Range support...');
+          verifyRangeSupport(videoUrl).catch(err => {
+            console.warn('Range support 驗證失敗（不影響上傳）:', err);
+          });
+
           resolve({ videoUrl, videoId: videoProjectId, thumbnailUrl });
         } catch (error) {
            console.error('Failed to get download URL:', error);

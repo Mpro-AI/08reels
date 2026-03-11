@@ -11,7 +11,7 @@ interface AnnotationCanvasProps {
   annotations: Annotation[];
   onAddAnnotation: (data: PenAnnotationData, type: 'pen') => void;
   onUpdateAnnotation: (annotation: Annotation) => void;
-  onEnterTextMode: (coords: { x: number, y: number }) => void;
+  onEnterTextMode: (canvasCoords: { x: number, y: number }, screenCoords: { x: number, y: number }) => void;
   annotationMode: AnnotationMode;
   penColor: string;
   penLineWidth: number;
@@ -21,8 +21,9 @@ interface AnnotationCanvasProps {
 type Action = 'drawing' | 'dragging' | 'resizing' | 'rotating' | 'none';
 
 // Constants for control handles
-const HANDLE_SIZE = 8;
-const ROTATION_HANDLE_OFFSET = 20;
+const HANDLE_SIZE = 16; // 增大按鈕尺寸
+const HANDLE_HIT_SIZE = 24; // 點擊區域比視覺更大，更容易點擊
+const ROTATION_HANDLE_OFFSET = 30;
 
 const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   width,
@@ -64,10 +65,18 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
       clientY = (event.nativeEvent as MouseEvent).clientY;
     }
 
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
+    // Canvas 座標 (用於繪製)
+    const canvasX = (clientX - rect.left) * scaleX;
+    const canvasY = (clientY - rect.top) * scaleY;
 
-    return { x, y };
+    // 屏幕座標 (相對於 Canvas 元素,用於 UI 定位)
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+
+    return {
+      canvas: { x: canvasX, y: canvasY },
+      screen: { x: screenX, y: screenY }
+    };
   };
 
   // #region Drawing Logic
@@ -115,15 +124,39 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     ctx.translate(data.x + data.width / 2, data.y + data.height / 2);
     ctx.rotate(data.rotation);
 
+    // 繪製背景 (如果有設定)
+    if (data.backgroundColor) {
+      const padding = 4;
+      ctx.fillStyle = data.backgroundColor;
+      ctx.fillRect(
+        -data.width / 2 - padding,
+        -data.height / 2 - padding,
+        data.width + padding * 2,
+        data.height + padding * 2
+      );
+    }
+
+    // 計算原始文字尺寸
     ctx.font = `${data.fontSize}px sans-serif`;
+    const metrics = ctx.measureText(data.text);
+    const originalWidth = metrics.width;
+    const originalHeight = data.fontSize * 1.2;
+
+    // 計算縮放比例，讓文字填滿邊界框
+    const scaleX = data.width / originalWidth;
+    const scaleY = data.height / originalHeight;
+
+    // 應用縮放
+    ctx.scale(scaleX, scaleY);
+
     ctx.fillStyle = data.color;
-    ctx.textBaseline = 'top';
-    ctx.fillText(data.text, -data.width / 2, -data.height / 2);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(data.text, -originalWidth / 2, 0);
 
     ctx.restore();
-    
+
     if (isSelected) {
-        drawSelectionHandles(ctx, { ...data, url: '' }); // Pass a compatible object
+        drawSelectionHandles(ctx, { ...data, url: '' });
     }
   };
 
@@ -134,29 +167,50 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
       // Draw bounding box
       ctx.strokeStyle = '#09f';
-      ctx.lineWidth = 1 / (width / 1920); // Scale line width
+      ctx.lineWidth = 2 / (width / 1920); // 稍微加粗邊框
       ctx.strokeRect(-data.width / 2, -data.height / 2, data.width, data.height);
-      
+
       const scaledHandleSize = HANDLE_SIZE / (width/1920);
-      
-      // Draw resize handle (bottom-right)
+      const halfHandle = scaledHandleSize / 2;
+      const halfWidth = data.width / 2;
+      const halfHeight = data.height / 2;
+
+      // 繪製四個角落的縮放把手
       ctx.fillStyle = '#09f';
-      ctx.fillRect(data.width / 2 - scaledHandleSize / 2, data.height / 2 - scaledHandleSize / 2, scaledHandleSize, scaledHandleSize);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2 / (width / 1920);
+
+      // 右下角 (主要縮放把手)
+      ctx.fillRect(halfWidth - halfHandle, halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+      ctx.strokeRect(halfWidth - halfHandle, halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+
+      // 左下角
+      ctx.fillRect(-halfWidth - halfHandle, halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+      ctx.strokeRect(-halfWidth - halfHandle, halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+
+      // 右上角
+      ctx.fillRect(halfWidth - halfHandle, -halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+      ctx.strokeRect(halfWidth - halfHandle, -halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+
+      // 左上角
+      ctx.fillRect(-halfWidth - halfHandle, -halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
+      ctx.strokeRect(-halfWidth - halfHandle, -halfHeight - halfHandle, scaledHandleSize, scaledHandleSize);
 
       // Draw rotation handle (top-center)
       const scaledRotationOffset = ROTATION_HANDLE_OFFSET / (width/1920);
       ctx.beginPath();
-      ctx.moveTo(0, -data.height / 2);
-      ctx.lineTo(0, -data.height / 2 - scaledRotationOffset);
+      ctx.moveTo(0, -halfHeight);
+      ctx.lineTo(0, -halfHeight - scaledRotationOffset);
       ctx.strokeStyle = '#09f';
+      ctx.lineWidth = 2 / (width / 1920);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0, -data.height / 2 - scaledRotationOffset, scaledHandleSize / 2, 0, 2 * Math.PI);
+      ctx.arc(0, -halfHeight - scaledRotationOffset, scaledHandleSize / 2 + 2 / (width/1920), 0, 2 * Math.PI);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.strokeStyle = '#09f';
       ctx.stroke();
-      
+
       ctx.restore();
   };
 
@@ -218,34 +272,44 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   
   const getActionForPoint = (point: {x:number, y:number}, annotation: Annotation): Action => {
       if (annotation.type !== 'image' && annotation.type !== 'text') return 'none';
-      
+
       const data = annotation.data as ImageAnnotationData | TextAnnotationData;
       const centerX = data.x + data.width / 2;
       const centerY = data.y + data.height / 2;
-  
+
       // Transform point to annotation's local coordinate system
       const translatedX = point.x - centerX;
       const translatedY = point.y - centerY;
       const rotatedX = translatedX * Math.cos(-data.rotation) - translatedY * Math.sin(-data.rotation);
       const rotatedY = translatedX * Math.sin(-data.rotation) + translatedY * Math.cos(-data.rotation);
-  
-      const scaledHandleSize = HANDLE_SIZE / (width/1920);
 
-      // Check resize handle
-      const resizeHandleX = data.width / 2;
-      const resizeHandleY = data.height / 2;
-      if (Math.abs(rotatedX - resizeHandleX) < scaledHandleSize && Math.abs(rotatedY - resizeHandleY) < scaledHandleSize) {
-        return 'resizing';
-      }
-      
+      // 使用較大的點擊區域，更容易點擊
+      const scaledHitSize = HANDLE_HIT_SIZE / (width/1920);
       const scaledRotationOffset = ROTATION_HANDLE_OFFSET / (width/1920);
-      // Check rotation handle
+      const halfWidth = data.width / 2;
+      const halfHeight = data.height / 2;
+
+      // Check all 4 corner resize handles
+      const corners = [
+        { x: halfWidth, y: halfHeight },     // 右下
+        { x: -halfWidth, y: halfHeight },    // 左下
+        { x: halfWidth, y: -halfHeight },    // 右上
+        { x: -halfWidth, y: -halfHeight },   // 左上
+      ];
+
+      for (const corner of corners) {
+        if (Math.abs(rotatedX - corner.x) < scaledHitSize && Math.abs(rotatedY - corner.y) < scaledHitSize) {
+          return 'resizing';
+        }
+      }
+
+      // Check rotation handle (top-center)
       const rotationHandleX = 0;
-      const rotationHandleY = -data.height / 2 - scaledRotationOffset;
-      if (Math.sqrt((rotatedX - rotationHandleX)**2 + (rotatedY - rotationHandleY)**2) < scaledHandleSize) {
+      const rotationHandleY = -halfHeight - scaledRotationOffset;
+      if (Math.sqrt((rotatedX - rotationHandleX)**2 + (rotatedY - rotationHandleY)**2) < scaledHitSize) {
           return 'rotating';
       }
-  
+
       // Default to dragging if inside
       return 'dragging';
   }
@@ -254,26 +318,26 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     const coords = getCoords(e);
     if (!coords || !isAnnotating) return;
-    setStartPoint(coords);
-    
+    setStartPoint(coords.canvas);
+
     // Check if we are in a mode to add a new annotation
     if (annotationMode === 'pen') {
       setAction('drawing');
-      setCurrentPath([coords]);
+      setCurrentPath([coords.canvas]);
       return;
     }
 
     if (annotationMode === 'text') {
-      onEnterTextMode(coords);
+      onEnterTextMode(coords.canvas, coords.screen);
       return;
     }
-    
+
     // If not in an "add" mode, check for interaction with existing annotations
-    const selected = getAnnotationAtPoint(coords);
+    const selected = getAnnotationAtPoint(coords.canvas);
     setSelectedAnnotationId(selected?.id || null);
 
     if (selected) {
-      const currentAction = getActionForPoint(coords, selected);
+      const currentAction = getActionForPoint(coords.canvas, selected);
       setAction(currentAction);
     } else {
       setAction('none');
@@ -282,22 +346,22 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (action === 'none' || !startPoint) return;
-    
+
     const coords = getCoords(e);
     if (!coords) return;
-    
+
     if (action === 'drawing') {
-        setCurrentPath((prev) => [...prev, coords]);
+        setCurrentPath((prev) => [...prev, coords.canvas]);
         return;
     }
-    
+
     const selectedAnnotation = annotations.find(a => a.id === selectedAnnotationId);
     if (!selectedAnnotation || (selectedAnnotation.type !== 'image' && selectedAnnotation.type !== 'text')) return;
-    
+
     let updatedData = { ...selectedAnnotation.data } as ImageAnnotationData | TextAnnotationData;
-    
-    const dx = coords.x - startPoint.x;
-    const dy = coords.y - startPoint.y;
+
+    const dx = coords.canvas.x - startPoint.x;
+    const dy = coords.canvas.y - startPoint.y;
 
     if (action === 'dragging') {
         updatedData.x += dx;
@@ -321,21 +385,21 @@ const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
               (updatedData as ImageAnnotationData).height += rotatedDy;
           }
         } else if (selectedAnnotation.type === 'text') {
-            const textData = updatedData as TextAnnotationData;
-            textData.fontSize *= (textData.width / originalWidth);
-            textData.height = textData.fontSize;
+            // 文字可以自由縮放寬高，fontSize 保持不變
+            // 渲染時會用 scale 來拉伸文字填滿邊界框
+            (updatedData as TextAnnotationData).height += rotatedDy;
         }
 
     } else if (action === 'rotating') {
-        const centerX = selectedAnnotation.data.x + selectedAnnotation.data.width / 2;
-        const centerY = selectedAnnotation.data.y + selectedAnnotation.data.height / 2;
+        const centerX = updatedData.x + updatedData.width / 2;
+        const centerY = updatedData.y + updatedData.height / 2;
         const startAngle = Math.atan2(startPoint.y - centerY, startPoint.x - centerX);
-        const currentAngle = Math.atan2(coords.y - centerY, coords.x - centerX);
+        const currentAngle = Math.atan2(coords.canvas.y - centerY, coords.canvas.x - centerX);
         updatedData.rotation += (currentAngle - startAngle);
     }
 
     onUpdateAnnotation({ ...selectedAnnotation, data: updatedData });
-    setStartPoint(coords);
+    setStartPoint(coords.canvas);
   };
 
   const handleMouseUp = () => {

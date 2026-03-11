@@ -11,7 +11,7 @@ export type Comment = {
   timecode: number;
   timecodeFormatted: string;
   text: string;
-  author: Pick<User, 'id', 'name'>;
+  author: Pick<User, 'id' | 'name'>;
   createdAt: string;
 };
 
@@ -38,6 +38,7 @@ export type TextAnnotationData = {
   height: number;
   fontSize: number;
   color: string;
+  backgroundColor?: string; // 背景顏色 (可選)
   rotation: number; // in radians
 };
 
@@ -45,7 +46,7 @@ export type Annotation = {
     id: string;
     type: 'pen' | 'image' | 'text';
     data: PenAnnotationData | ImageAnnotationData | TextAnnotationData;
-    author: Pick<User, 'id', 'name'>;
+    author: Pick<User, 'id' | 'name'>;
     createdAt: string;
     timecode: number;
 }
@@ -63,7 +64,7 @@ export type Version = {
   versionNumber: number;
   status: VersionStatus;
   createdAt: string;
-  uploader: Pick<User, 'id', 'name'>;
+  uploader: Pick<User, 'id' | 'name'>;
   comments: Comment[];
   annotations: Annotation[];
   isCurrentActive: boolean;
@@ -78,7 +79,7 @@ export type Video = {
   title: string;
   thumbnailUrl: string;
   thumbnailHint: string;
-  author: Pick<User, 'id', 'name'>;
+  author: Pick<User, 'id' | 'name'>;
   uploadedAt: string;
   versions: Version[];
   videoUrl: string; // The URL of the currently active video version for quick access

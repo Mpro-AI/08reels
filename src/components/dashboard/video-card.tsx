@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState } from 'react';
 import { ManageVideoDialog } from '../video/manage-video-dialog';
+import { Checkbox } from '../ui/checkbox';
 
 const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   approved: { text: '已核可', variant: 'default' },
@@ -19,7 +20,21 @@ const statusMap: Record<VersionStatus, { text: string; variant: 'default' | 'sec
   rejected: { text: '已拒絕', variant: 'destructive' },
 };
 
-export default function VideoCard({ video, onVideoDeleted }: { video: Video; onVideoDeleted: (videoId: string) => void; }) {
+interface VideoCardProps {
+  video: Video;
+  onVideoDeleted: (videoId: string) => void;
+  batchMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (selected: boolean) => void;
+}
+
+export default function VideoCard({
+  video,
+  onVideoDeleted,
+  batchMode = false,
+  isSelected = false,
+  onSelect
+}: VideoCardProps) {
   const { user } = useAuth();
   const [showManageDialog, setShowManageDialog] = useState(false);
   const latestVersion = video.versions.length > 0 ? [...video.versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] : null;
@@ -34,10 +49,40 @@ export default function VideoCard({ video, onVideoDeleted }: { video: Video; onV
     setShowManageDialog(false);
   }
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (batchMode && onSelect) {
+      e.preventDefault();
+      onSelect(!isSelected);
+    }
+  };
+
   return (
     <>
-      <Card className="flex flex-col overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 relative group">
-        <Link href={`/videos/${video.id}`} className="block">
+      <Card
+        className={`flex flex-col overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 relative group ${
+          batchMode ? 'cursor-pointer' : ''
+        } ${isSelected ? 'ring-2 ring-primary' : ''}`}
+        onClick={handleCardClick}
+      >
+        {/* 批次選擇模式下的複選框 */}
+        {batchMode && (
+          <div
+            className="absolute top-2 left-2 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(checked) => onSelect?.(checked as boolean)}
+              className="h-6 w-6 bg-white border-2 shadow-lg"
+            />
+          </div>
+        )}
+
+        <Link
+          href={`/videos/${video.id}`}
+          className="block"
+          onClick={(e) => batchMode && e.preventDefault()}
+        >
           <div className="aspect-video overflow-hidden">
             <Image
               src={video.thumbnailUrl}
@@ -50,7 +95,7 @@ export default function VideoCard({ video, onVideoDeleted }: { video: Video; onV
           </div>
         </Link>
 
-        {hasAssignedUsers && (
+        {hasAssignedUsers && !batchMode && (
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
             <Users className="h-3 w-3" />
             <span>{assignedCount}</span>
@@ -59,13 +104,22 @@ export default function VideoCard({ video, onVideoDeleted }: { video: Video; onV
         
         <CardHeader className="flex-grow">
           <div className='flex items-start justify-between gap-2'>
-            <Link href={`/videos/${video.id}`} className="block flex-1">
+            <Link
+              href={`/videos/${video.id}`}
+              className="block flex-1"
+              onClick={(e) => batchMode && e.preventDefault()}
+            >
               <CardTitle className="text-lg font-headline hover:text-primary">{video.title}</CardTitle>
             </Link>
-            {canManage && (
+            {canManage && !batchMode && (
                <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>

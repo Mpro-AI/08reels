@@ -27,10 +27,10 @@ export function FirebaseClientProvider({
         const app = await initializeFirebase();
         const auth = getAuth(app);
         const firestore = getFirestore(app);
-        
-        // ✅ Use the bucket from the config
-        const storage = getStorage(app);
-        
+
+        // ✅ 使用指定的 Storage bucket
+        const storage = getStorage(app, 'gs://studio-3640087795-37708.firebasestorage.app');
+
         console.log('📦 Storage Bucket Initialized:', storage.app.options.storageBucket);
 
         setFirebase({ app, auth, firestore, storage });

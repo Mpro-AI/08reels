@@ -18,11 +18,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AppLayoutContext } from '@/components/app-layout';
 
 function formatTime(seconds: number): string {
-  if (isNaN(seconds)) return '00:00:00';
+  if (isNaN(seconds)) return '00:00:00.000';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+  const ms = Math.floor((seconds % 1) * 1000);
+  return `${[h, m, s].map(v => v.toString().padStart(2, '0')).join(':')}.${ms.toString().padStart(3, '0')}`;
 }
 
 export type AnnotationMode = 'pen' | 'select' | 'image' | 'text';
@@ -53,11 +54,13 @@ export default function VideoPage() {
   const [penLineWidth, setPenLineWidth] = useState(3);
   
   const [newAnnotations, setNewAnnotations] = useState<Annotation[]>([]);
+  const [modifiedAnnotationIds, setModifiedAnnotationIds] = useState<Set<string>>(new Set()); // 追蹤已修改的現有註解
   const [isUploading, setIsUploading] = useState(false);
   const imageAnnotationInputRef = useRef<HTMLInputElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   const [isTextAnnotating, setIsTextAnnotating] = useState(false);
-  const [textAnnotationCoords, setTextAnnotationCoords] = useState<{ x: number, y: number } | null>(null);
+  const [textAnnotationCoords, setTextAnnotationCoords] = useState<{ canvas: { x: number, y: number }, screen: { x: number, y: number } } | null>(null);
 
   const [videoNaturalSize, setVideoNaturalSize] = useState<{width: number, height: number}>({
     width: 1920,
@@ -123,7 +126,6 @@ export default function VideoPage() {
               link.rel = 'prefetch';
               link.href = nextUrl;
               link.as = 'video';
-              link.crossOrigin = 'anonymous';
               document.head.appendChild(link);
               
               setPreloadedUrls(prev => new Set(prev).add(nextUrl));
@@ -277,33 +279,40 @@ export default function VideoPage() {
     setNewAnnotations(prev => [...prev, annotationData]);
   };
   
-  const handleEnterTextMode = (coords: { x: number; y: number }) => {
-    setTextAnnotationCoords(coords);
+  const handleEnterTextMode = (canvasCoords: { x: number; y: number }, screenCoords: { x: number; y: number }) => {
+    setTextAnnotationCoords({ canvas: canvasCoords, screen: screenCoords });
     setIsTextAnnotating(true);
   };
   
-  const handleCompleteTextAnnotation = (text: string) => {
+  const handleCompleteTextAnnotation = (text: string, fontSize: number, color: string, backgroundColor?: string) => {
     if (!user || !textAnnotationCoords) return;
-  
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+
+    const tempCanvas = document.createElement('canvas');
+    const ctx = tempCanvas.getContext('2d');
     if (!ctx) return;
-  
-    const fontSize = videoNaturalSize.height * 0.03;
-    ctx.font = `${fontSize}px sans-serif`;
+
+    // 根據影片尺寸縮放字體大小
+    const scaledFontSize = fontSize * (videoNaturalSize.height / 1080);
+    ctx.font = `${scaledFontSize}px sans-serif`;
     const textMetrics = ctx.measureText(text);
-  
+
+    // 使用 fontSize 作為高度基準，加上適當的行高比例 (1.2)
+    // 這樣文字看起來比例更自然
+    const textHeight = scaledFontSize * 1.2;
+
+    // 使用 canvas 坐標來放置註解
     const textData: TextAnnotationData = {
       text,
-      x: textAnnotationCoords.x - textMetrics.width / 2,
-      y: textAnnotationCoords.y - fontSize / 2,
+      x: textAnnotationCoords.canvas.x - textMetrics.width / 2,
+      y: textAnnotationCoords.canvas.y - textHeight / 2,
       width: textMetrics.width,
-      height: fontSize,
-      fontSize,
-      color: penColor,
+      height: textHeight,
+      fontSize: scaledFontSize,
+      color,
+      backgroundColor,
       rotation: 0,
     };
-  
+
     const newAnnotation: Annotation = {
       id: `new-${Date.now()}`,
       type: 'text',
@@ -312,23 +321,29 @@ export default function VideoPage() {
       createdAt: new Date().toISOString(),
       timecode: Math.floor(currentTime),
     };
-  
+
     setNewAnnotations(prev => [...prev, newAnnotation]);
     setIsTextAnnotating(false);
     setTextAnnotationCoords(null);
-    setIsAnnotating(false);
+    // 保持標註模式開啟,讓用戶可以繼續編輯
     setAnnotationMode('select');
+    // 不要設置 setIsAnnotating(false),讓用戶可以拖拉/縮放剛創建的文字
     toast({ title: '文字註解已新增' });
   };
 
 
   const handleUpdateAnnotation = (updatedAnnotation: Annotation) => {
     if (updatedAnnotation.id.startsWith('new-')) {
+        // 新註解只更新本地狀態
         setNewAnnotations(prev => prev.map(a => a.id === updatedAnnotation.id ? updatedAnnotation : a));
     } else {
-        if (!firestore || !video || !selectedVersionId) return;
-        updateAnnotationInVersion(firestore, video.id, selectedVersionId, updatedAnnotation);
-        
+        // 已儲存的註解 - 只有管理員可以修改
+        if (!isAdmin || !video || !selectedVersionId) return;
+
+        // 標記此註解已被修改
+        setModifiedAnnotationIds(prev => new Set(prev).add(updatedAnnotation.id));
+
+        // 更新本地顯示
         if (setVideo) {
             const updatedVideo = { ...video };
             const versionIndex = updatedVideo.versions.findIndex(v => v.id === selectedVersionId);
@@ -343,25 +358,68 @@ export default function VideoPage() {
     }
   };
 
-  const handleSaveAnnotations = () => {
-    if (!firestore || !user || !video || !selectedVersionId || newAnnotations.length === 0) return;
-    
-    const annotationsToAdd = newAnnotations.map(({id, ...rest}) => rest);
-    
-    addAnnotationsToVersion(firestore, video.id, selectedVersionId, annotationsToAdd);
-    
-    setNewAnnotations([]);
-    setIsAnnotating(false);
-    setAnnotationMode('select');
-    toast({ title: '註解已儲存' });
+  // 清理註解數據，移除 undefined 值（Firestore 不接受 undefined）
+  const cleanAnnotationData = (annotation: Annotation): Annotation => {
+    const cleaned = JSON.parse(JSON.stringify(annotation, (_, value) =>
+      value === undefined ? null : value
+    ));
+    // 移除 null 值的可選欄位
+    if (cleaned.data && cleaned.data.backgroundColor === null) {
+      delete cleaned.data.backgroundColor;
+    }
+    return cleaned;
+  };
+
+  const handleSaveAnnotations = async () => {
+    if (!firestore || !user || !video || !selectedVersionId) return;
+
+    const hasNewAnnotations = newAnnotations.length > 0;
+    const hasModifiedAnnotations = modifiedAnnotationIds.size > 0;
+
+    if (!hasNewAnnotations && !hasModifiedAnnotations) return;
+
+    try {
+      // 儲存新註解
+      if (hasNewAnnotations) {
+        const annotationsToAdd = newAnnotations.map(ann => {
+          const { id, ...rest } = cleanAnnotationData(ann);
+          return rest;
+        });
+        await addAnnotationsToVersion(firestore, video.id, selectedVersionId, annotationsToAdd);
+      }
+
+      // 儲存已修改的現有註解
+      if (hasModifiedAnnotations) {
+        const currentVersion = video.versions.find(v => v.id === selectedVersionId);
+        if (currentVersion) {
+          for (const annotationId of modifiedAnnotationIds) {
+            const annotation = currentVersion.annotations.find(a => a.id === annotationId);
+            if (annotation) {
+              const cleanedAnnotation = cleanAnnotationData(annotation);
+              await updateAnnotationInVersion(firestore, video.id, selectedVersionId, cleanedAnnotation);
+            }
+          }
+        }
+      }
+
+      setNewAnnotations([]);
+      setModifiedAnnotationIds(new Set());
+      setIsAnnotating(false);
+      setAnnotationMode('select');
+      toast({ title: '註解已儲存' });
+    } catch (error) {
+      console.error('儲存註解失敗:', error);
+      toast({ variant: 'destructive', title: '儲存失敗', description: '無法儲存註解，請稍後再試。' });
+    }
   };
   
   const exitAnnotationMode = () => {
-    if (newAnnotations.length > 0) {
-      const confirmExit = confirm('您有尚未儲存的註解，確定要捨棄嗎？');
+    if (newAnnotations.length > 0 || modifiedAnnotationIds.size > 0) {
+      const confirmExit = confirm('您有尚未儲存的變更，確定要捨棄嗎？');
       if (!confirmExit) return;
     }
     setNewAnnotations([]);
+    setModifiedAnnotationIds(new Set());
     setIsAnnotating(false);
     setAnnotationMode('select');
     setIsUploading(false);
@@ -369,14 +427,14 @@ export default function VideoPage() {
     setTextAnnotationCoords(null);
   };
 
-  const togglePlayPause = () => {
+  const togglePlayPause = useCallback(() => {
     if (!playerRef.current) return;
     if (playerRef.current.paused) {
       playerRef.current.play();
     } else {
       playerRef.current.pause();
     }
-  };
+  }, []);
 
 
   useEffect(() => {
@@ -399,12 +457,12 @@ export default function VideoPage() {
         togglePlayPause();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [togglePlayPause]);
   
   if (loading || !video || !selectedVersion || videosLoading) {
     return (
@@ -434,7 +492,7 @@ export default function VideoPage() {
         <Header title={video.title} />
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 overflow-hidden">
             <div className="lg:col-span-2 xl:col-span-3 bg-background p-4 h-full max-h-full flex items-center justify-center">
-              <div className="relative w-full max-w-5xl mx-auto">
+              <div ref={videoContainerRef} className="relative w-full max-w-5xl mx-auto">
                 <VideoPlayer 
                   src={selectedVersion.videoUrl} 
                   poster={currentThumbnail}
@@ -442,6 +500,18 @@ export default function VideoPage() {
                   isPaused={isAnnotating || isTextAnnotating}
                   qualities={selectedVersion.qualities}
                 />
+                {/* 註解模式提示（手機友好） */}
+                {(isAnnotating || isTextAnnotating) && (
+                  <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+                    <span>📝 註解模式已啟用（影片已暫停）</span>
+                    <button
+                      onClick={exitAnnotationMode}
+                      className="bg-white text-orange-500 px-3 py-1 rounded hover:bg-gray-100 font-bold"
+                    >
+                      退出
+                    </button>
+                  </div>
+                )}
                 {isAdmin && isAnnotating && (
                   <div className="absolute top-4 z-20 flex w-full justify-center">
                      <AnnotationToolbar
@@ -458,15 +528,15 @@ export default function VideoPage() {
                         onLineWidthChange={setPenLineWidth}
                         onSave={handleSaveAnnotations}
                         onExit={exitAnnotationMode}
-                        isSavingDisabled={newAnnotations.length === 0}
+                        isSavingDisabled={newAnnotations.length === 0 && modifiedAnnotationIds.size === 0}
                         isUploading={isUploading}
                       />
                   </div>
                 )}
                 {isAdmin && isTextAnnotating && textAnnotationCoords && (
                     <TextAnnotationInput
-                        x={textAnnotationCoords.x}
-                        y={textAnnotationCoords.y}
+                        x={textAnnotationCoords.screen.x}
+                        y={textAnnotationCoords.screen.y}
                         onComplete={handleCompleteTextAnnotation}
                         onCancel={() => {
                             setIsTextAnnotating(false);
@@ -474,6 +544,8 @@ export default function VideoPage() {
                             setIsAnnotating(false);
                             setAnnotationMode('select');
                         }}
+                        initialColor={penColor}
+                        containerRef={videoContainerRef}
                     />
                 )}
                 <AnnotationCanvas 

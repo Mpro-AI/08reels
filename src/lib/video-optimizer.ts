@@ -90,8 +90,11 @@ export async function optimizeVideoForWeb(
           const videoStream = (video as any).captureStream();
           const audioTracks = videoStream.getAudioTracks();
           if (audioTracks.length > 0) {
-            audioTrack = audioTracks[0];
-            canvasStream.addTrack(audioTrack);
+            const track = audioTracks[0];
+            if (track) {
+              audioTrack = track;
+              canvasStream.addTrack(track);
+            }
           }
         } catch (error) {
           console.warn('無法擷取音訊軌道:', error);
@@ -230,6 +233,95 @@ export function estimateOptimizedFileSize(
   const videoSize = (bitrate * durationSeconds) / 8;
   const audioSize = (128000 * durationSeconds) / 8; // 假設 128kbps 音訊
   const overhead = 1.05; // 5% 容器開銷
-  
+
   return Math.ceil((videoSize + audioSize) * overhead);
+}
+
+/**
+ * 檢查影片是否為串流優化格式
+ * @param file 影片檔案
+ * @returns Promise 包含檢查結果和建議
+ */
+export async function checkVideoStreamingOptimization(file: File): Promise<{
+  isOptimized: boolean;
+  format: string;
+  hasAudio: boolean;
+  duration: number;
+  width: number;
+  height: number;
+  recommendations: string[];
+}> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+
+    const recommendations: string[] = [];
+
+    video.onloadedmetadata = () => {
+      const format = file.type;
+      const isMP4 = format === 'video/mp4';
+      const isWebM = format === 'video/webm';
+
+      // 檢查格式
+      if (!isMP4 && !isWebM) {
+        recommendations.push('建議使用 MP4 或 WebM 格式以獲得最佳串流效果');
+      }
+
+      // 檢查解析度
+      if (video.videoWidth > 1920 || video.videoHeight > 1080) {
+        recommendations.push('影片解析度過高 (建議 1080p 以下)，可能導致載入緩慢');
+      }
+
+      // 檢查時長
+      if (video.duration > 600) { // 10 分鐘以上
+        recommendations.push('長影片建議使用較低位元率或分段上傳');
+      }
+
+      // 估算位元率
+      const estimatedBitrate = (file.size * 8) / video.duration;
+      if (estimatedBitrate > 10000000) { // > 10 Mbps
+        recommendations.push(`影片位元率過高 (約 ${(estimatedBitrate / 1000000).toFixed(1)} Mbps)，建議壓縮後上傳`);
+      }
+
+      URL.revokeObjectURL(video.src);
+
+      resolve({
+        isOptimized: recommendations.length === 0,
+        format: format,
+        hasAudio: true, // 無法準確檢測，假設有音訊
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+        recommendations,
+      });
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(video.src);
+      resolve({
+        isOptimized: false,
+        format: file.type,
+        hasAudio: false,
+        duration: 0,
+        width: 0,
+        height: 0,
+        recommendations: ['無法讀取影片資訊，請確認檔案格式正確'],
+      });
+    };
+
+    video.src = URL.createObjectURL(file);
+  });
+}
+
+/**
+ * 取得影片格式建議
+ */
+export function getVideoFormatRecommendations(): string[] {
+  return [
+    '最佳格式: MP4 (H.264 編碼) - 相容性最好',
+    '替代格式: WebM (VP9 編碼) - 檔案較小',
+    '建議解析度: 1080p (1920x1080) 或以下',
+    '建議位元率: 2-5 Mbps',
+    '使用 ffmpeg 優化: ffmpeg -i input.mp4 -movflags +faststart output.mp4',
+  ];
 }

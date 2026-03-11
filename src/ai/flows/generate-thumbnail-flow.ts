@@ -48,11 +48,12 @@ const generateThumbnailFlow = ai.defineFlow(
     },
     async (input) => {
         try {
+            const promptResult = await prompt(input);
             const { media } = await ai.generate({
                 model: 'googleai/imagen-4.0-fast-generate-001',
-                prompt: await prompt(input),
+                prompt: promptResult.text,
             });
-            return media.url;
+            return media?.url || null;
         } catch (error) {
             console.error('Error generating thumbnail:', error);
             return null;
