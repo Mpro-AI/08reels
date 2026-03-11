@@ -25,53 +25,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
 
-    // Check if user already exists in users table
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', supabaseUser.id)
-      .single();
+    try {
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return null;
 
-    if (existingUser) {
-      const appUser: User = {
-        id: existingUser.id,
-        name: existingUser.name || supabaseUser.email?.split('@')[0] || 'Anonymous',
-        email: existingUser.email || supabaseUser.email,
-        photoURL: existingUser.photo_url,
-        role: existingUser.role === 'admin' ? 'admin' : 'employee',
-      };
+      // Call server-side API route (uses service_role key, bypasses RLS)
+      const res = await fetch('/api/auth/upsert-profile', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
 
-      // Sync name/email if changed
-      await supabase
-        .from('users')
-        .update({
-          name: appUser.name,
-          email: appUser.email,
-        })
-        .eq('id', supabaseUser.id);
+      if (!res.ok) {
+        console.error('[upsertUserProfile] API error:', res.status);
+        return null;
+      }
 
-      return appUser;
-    } else {
-      // New user — default to employee role
-      const appUser: User = {
-        id: supabaseUser.id,
-        name: supabaseUser.email?.split('@')[0] || 'Anonymous',
-        email: supabaseUser.email,
-        photoURL: null,
-        role: 'employee',
-      };
-
-      await supabase
-        .from('users')
-        .insert({
-          id: supabaseUser.id,
-          name: appUser.name,
-          email: appUser.email,
-          photo_url: appUser.photoURL,
-          role: appUser.role,
-        });
-
-      return appUser;
+      return await res.json() as User;
+    } catch (err) {
+      console.error('[upsertUserProfile] Failed:', err);
+      return null;
     }
   }, [supabase]);
 
