@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
 import { useSupabase } from '@/supabase';
@@ -21,12 +21,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const supabase = useSupabase();
+  const mountedRef = useRef(true);
 
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
 
     try {
-      // Check if user already exists in users table
       const { data: existingUser, error: selectError } = await supabase
         .from('users')
         .select('*')
@@ -34,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (selectError && selectError.code !== 'PGRST116') {
-        // PGRST116 = no rows found (expected for new users), other errors are real
         console.error('[upsertUserProfile] select error:', selectError);
       }
 
@@ -47,7 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: existingUser.role === 'admin' ? 'admin' : 'employee',
         };
       } else {
-        // New user — default to employee role
         const appUser: User = {
           id: supabaseUser.id,
           name: supabaseUser.email?.split('@')[0] || 'Anonymous',
@@ -74,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('[upsertUserProfile] unexpected error:', err);
-      // Return a minimal user object from the Supabase auth data so auth still works
       return {
         id: supabaseUser.id,
         name: supabaseUser.email?.split('@')[0] || 'Anonymous',
@@ -86,58 +83,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
-    // Safety net: if loading hasn't cleared after 5s, force it off.
+    // === HARD TIMEOUT: loading MUST clear within 5s no matter what ===
     const timeout = setTimeout(() => {
-      if (mounted) {
+      if (mountedRef.current) {
         console.warn('[auth] 5s timeout — forcing loading off');
         setLoading(false);
       }
     }, 5000);
 
-    // 1. getSession() for initial load — reads cached session from localStorage.
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (session?.user) {
-          const appUser = await upsertUserProfile(session.user);
-          if (mounted) setUser(appUser);
-        } else {
-          if (mounted) setUser(null);
-        }
-      } catch (err) {
-        console.error('[getSession] error:', err);
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    // 2. onAuthStateChange for subsequent updates only — skip INITIAL_SESSION.
+    // === SINGLE SOURCE OF TRUTH: onAuthStateChange handles everything ===
+    // Do NOT call getSession() separately — it triggers Supabase internal
+    // token refresh which holds the auth lock, blocking subsequent
+    // signInWithPassword calls and causing "Processing..." to hang forever.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'INITIAL_SESSION') return; // already handled by getSession
-
+      async (_event, session) => {
         try {
           if (session?.user) {
             const appUser = await upsertUserProfile(session.user);
-            if (mounted) setUser(appUser);
+            if (mountedRef.current) setUser(appUser);
           } else {
-            if (mounted) setUser(null);
+            if (mountedRef.current) setUser(null);
           }
         } catch (err) {
           console.error('[onAuthStateChange] error:', err);
-          if (mounted) setUser(null);
+          if (mountedRef.current) setUser(null);
         } finally {
-          if (mounted) setLoading(false);
+          if (mountedRef.current) setLoading(false);
         }
       }
     );
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       clearTimeout(timeout);
       subscription.unsubscribe();
     };
@@ -148,14 +127,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      // Race signInWithPassword against a 10s timeout.
+      // If the Supabase auth lock is stuck, the timeout prevents eternal "Processing..."
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), 10000)
+        ),
+      ]);
+      if (result.error) throw result.error;
       toast({ title: '登入成功' });
       return true;
     } catch (error: any) {
       console.error("Email sign-in failed", error);
       let description = '發生未知錯誤，請稍後再試。';
-      if (error.message?.includes('Invalid login credentials')) {
+      if (error.message === 'LOGIN_TIMEOUT') {
+        description = '登入逾時，請重新整理頁面後再試。';
+      } else if (error.message?.includes('Invalid login credentials')) {
         description = '電子郵件或密碼不正確。';
       }
       toast({ variant: 'destructive', title: '登入失敗', description });
