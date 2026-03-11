@@ -25,27 +25,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
 
-    try {
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return null;
+    // Check if user already exists in users table
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .single();
 
-      // Call server-side API route (uses service_role key, bypasses RLS)
-      const res = await fetch('/api/auth/upsert-profile', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+    if (existingUser) {
+      return {
+        id: existingUser.id,
+        name: existingUser.name || supabaseUser.email?.split('@')[0] || 'Anonymous',
+        email: existingUser.email || supabaseUser.email,
+        photoURL: existingUser.photo_url,
+        role: existingUser.role === 'admin' ? 'admin' : 'employee',
+      };
+    } else {
+      // New user — default to employee role
+      const appUser: User = {
+        id: supabaseUser.id,
+        name: supabaseUser.email?.split('@')[0] || 'Anonymous',
+        email: supabaseUser.email,
+        photoURL: null,
+        role: 'employee',
+      };
 
-      if (!res.ok) {
-        console.error('[upsertUserProfile] API error:', res.status);
-        return null;
-      }
+      await supabase
+        .from('users')
+        .insert({
+          id: supabaseUser.id,
+          name: appUser.name,
+          email: appUser.email,
+          photo_url: appUser.photoURL,
+          role: appUser.role,
+        });
 
-      return await res.json() as User;
-    } catch (err) {
-      console.error('[upsertUserProfile] Failed:', err);
-      return null;
+      return appUser;
     }
   }, [supabase]);
 
