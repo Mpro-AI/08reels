@@ -7,10 +7,9 @@ import SidePanel from '@/components/video/side-panel';
 import type { Video, Version, Comment, VersionStatus, User, Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotationData } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useFirestore, useStorage } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion } from '@/firebase/firestore/videos';
-import { uploadAnnotationImage } from '@/firebase/storage';
+import { useDoc, useSupabase } from '@/supabase';
+import { addAnnotationsToVersion, setVersionStatus, deleteCommentFromVersion, updateAnnotationInVersion } from '@/supabase/db/videos';
+import { uploadAnnotationImage } from '@/supabase/storage';
 import AnnotationCanvas from '@/components/video/annotation-canvas';
 import AnnotationToolbar from '@/components/video/annotation-toolbar';
 import TextAnnotationInput from '@/components/video/text-annotation-input';
@@ -31,15 +30,14 @@ export type AnnotationMode = 'pen' | 'select' | 'image' | 'text';
 export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
   const { user } = useAuth();
   const { videos: allVideos, loading: videosLoading } = useContext(AppLayoutContext);
   
   const videoRef = useMemo(() => {
-    if (!firestore || !videoId) return null;
-    return doc(firestore, 'videos', videoId);
-  }, [firestore, videoId]);
+    if (!videoId) return null;
+    return { table: 'videos', id: videoId };
+  }, [videoId]);
 
   const { data: video, loading, setData: setVideo } = useDoc<Video>(videoRef);
   
@@ -163,7 +161,7 @@ export default function VideoPage() {
   }, []);
 
   const handleVersionStatusChange = useCallback((versionId: string, status: VersionStatus) => {
-    if (!firestore || !video || !user) return;
+    if (!video || !user) return;
     
     if (user.role !== 'admin' && user.id !== video.author.id) {
         toast({
@@ -174,28 +172,28 @@ export default function VideoPage() {
         return;
     }
 
-    setVersionStatus(firestore, video.id, versionId, status);
+    setVersionStatus(supabase, video.id, versionId, status);
     
     toast({
       title: '版本狀態已更新',
     });
-  }, [firestore, video, user, toast]);
+  }, [supabase, video, user, toast]);
 
   const handleDeleteComment = useCallback((commentId: string) => {
-    if (!firestore || !video || !user || !selectedVersionId) return;
+    if (!video || !user || !selectedVersionId) return;
     
-    deleteCommentFromVersion(firestore, video.id, selectedVersionId, commentId);
+    deleteCommentFromVersion(supabase, video.id, selectedVersionId, commentId);
 
     toast({
       variant: 'default',
       title: '評論已刪除',
     });
 
-  }, [firestore, video, user, selectedVersionId, toast]);
+  }, [supabase, video, user, selectedVersionId, toast]);
 
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !storage || !user || !selectedVersionId || !video) {
+    if (!file || !user || !selectedVersionId || !video) {
         if (imageAnnotationInputRef.current) imageAnnotationInputRef.current.value = '';
         return;
     }
@@ -204,7 +202,7 @@ export default function VideoPage() {
     setAnnotationMode('select');
 
     try {
-        const imageUrl = await uploadAnnotationImage(storage, file, videoId, selectedVersionId);
+        const imageUrl = await uploadAnnotationImage(supabase, file, videoId, selectedVersionId);
         
         const canvasWidth = videoNaturalSize.width;
         const canvasHeight = videoNaturalSize.height;
@@ -371,7 +369,7 @@ export default function VideoPage() {
   };
 
   const handleSaveAnnotations = async () => {
-    if (!firestore || !user || !video || !selectedVersionId) return;
+    if (!user || !video || !selectedVersionId) return;
 
     const hasNewAnnotations = newAnnotations.length > 0;
     const hasModifiedAnnotations = modifiedAnnotationIds.size > 0;
@@ -385,7 +383,7 @@ export default function VideoPage() {
           const { id, ...rest } = cleanAnnotationData(ann);
           return rest;
         });
-        await addAnnotationsToVersion(firestore, video.id, selectedVersionId, annotationsToAdd);
+        await addAnnotationsToVersion(supabase, video.id, selectedVersionId, annotationsToAdd);
       }
 
       // 儲存已修改的現有註解
@@ -396,7 +394,7 @@ export default function VideoPage() {
             const annotation = currentVersion.annotations.find(a => a.id === annotationId);
             if (annotation) {
               const cleanedAnnotation = cleanAnnotationData(annotation);
-              await updateAnnotationInVersion(firestore, video.id, selectedVersionId, cleanedAnnotation);
+              await updateAnnotationInVersion(supabase, video.id, selectedVersionId, cleanedAnnotation);
             }
           }
         }

@@ -1,4 +1,5 @@
 'use client';
+import { useSupabase } from '@/supabase';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,13 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useStorage } from '@/firebase';
+
 import { Loader2, Users, Trash2, AlertTriangle } from 'lucide-react';
 import { User, Video } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { updateVideoAssignedUsers, deleteVideo } from '@/firebase/firestore/videos';
+import { updateVideoAssignedUsers, deleteVideo } from '@/supabase/db/videos';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { getAllUsers } from '@/firebase/firestore/users';
+import { getAllUsers } from '@/supabase/db/users';
 import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
@@ -56,8 +57,8 @@ export function BatchManageDialog({
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
+  
   const { user: currentUser } = useAuth();
 
   const employees = allUsers.filter(u => u.role === 'employee');
@@ -83,10 +84,10 @@ export function BatchManageDialog({
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (isOpen && firestore) {
+      if (isOpen) {
         setIsLoadingUsers(true);
         try {
-          const userList = await getAllUsers(firestore);
+          const userList = await getAllUsers(supabase);
           setAllUsers(userList);
         } catch (error) {
           console.error("Failed to fetch users:", error);
@@ -97,7 +98,7 @@ export function BatchManageDialog({
       }
     };
     fetchUsers();
-  }, [isOpen, firestore, toast]);
+  }, [isOpen, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -112,12 +113,12 @@ export function BatchManageDialog({
   };
 
   const handleBatchAssignUsers = async () => {
-    if (!firestore) return;
+    if (false) return;
     setIsSubmitting(true);
 
     try {
       const updatePromises = selectedVideos.map(video =>
-        updateVideoAssignedUsers(firestore, video.id, selectedUserIds)
+        updateVideoAssignedUsers(supabase, video.id, selectedUserIds)
       );
 
       await Promise.all(updatePromises);
@@ -143,12 +144,12 @@ export function BatchManageDialog({
 
   const handleBatchDelete = async () => {
     console.log('🔴 handleBatchDelete called');
-    console.log('🔴 firestore:', !!firestore, 'storage:', !!storage);
+    console.log('Supabase: connected');
     console.log('🔴 canDeleteVideos:', canDeleteVideos.length);
     console.log('🔴 currentUser:', currentUser);
 
-    if (!firestore || !storage) {
-      console.error('❌ Firestore or Storage not available');
+    if (false) {
+      console.error('❌ 鉂?Supabase not available');
       toast({
         variant: 'destructive',
         title: '錯誤',
@@ -181,7 +182,7 @@ export function BatchManageDialog({
         const video = canDeleteVideos[i];
         console.log(`🔴 Deleting video ${i + 1}/${totalVideos}: ${video.title} (${video.id})`);
         try {
-          await deleteVideo(firestore, storage, video.id);
+          await deleteVideo(supabase, video.id);
           deletedIds.push(video.id);
           setDeleteProgress(((i + 1) / totalVideos) * 100);
           console.log(`✅ Successfully deleted: ${video.title}`);

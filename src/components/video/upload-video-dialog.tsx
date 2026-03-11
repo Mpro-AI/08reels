@@ -1,4 +1,5 @@
 'use client';
+import { useSupabase } from '@/supabase';
 import { useState, ReactNode, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,17 +17,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { addVideo } from '@/firebase/firestore/videos';
-import { useFirestore } from '@/firebase';
+import { addVideo } from '@/supabase/db/videos';
+
 import { Loader2, Image as ImageIcon, Users, CheckCircle2, AlertCircle } from 'lucide-react';
-import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/firebase/storage';
-import { useStorage } from '@/firebase';
+import { uploadVideoAndGetUrl, generateVideoThumbnail } from '@/supabase/storage';
+
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 import Image from 'next/image';
 import { Skeleton } from '../ui/skeleton';
-import { getAllEmployees } from '@/firebase/firestore/users';
+import { getAllEmployees } from '@/supabase/db/users';
 import { User } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
@@ -83,8 +84,8 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
+  
   const isAdmin = user?.role === 'admin';
 
   const form = useForm<UploadVideoForm>({
@@ -123,10 +124,10 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (isOpen && firestore && isAdmin) {
+      if (isOpen && isAdmin) {
         setIsLoadingEmployees(true);
         try {
-          const employeeList = await getAllEmployees(firestore);
+          const employeeList = await getAllEmployees(supabase);
           setEmployees(employeeList.filter(e => e.id !== user?.id));
         } catch (error) {
           console.error("Failed to fetch employees:", error);
@@ -137,7 +138,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
       }
     };
     fetchEmployees();
-  }, [isOpen, firestore, toast, user, isAdmin]);
+  }, [isOpen, toast, user, isAdmin]);
 
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -212,7 +213,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
   };
 
   const onSubmit = async (data: UploadVideoForm) => {
-    if (!user || !firestore || !storage) {
+    if (!user) {
       toast({ variant: 'destructive', title: '錯誤', description: '使用者未登入或服務連線失敗' });
       return;
     }
@@ -277,8 +278,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
           }
         }
 
-        const { videoUrl, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(
-          storage, 
+        const { videoUrl, videoId, thumbnailUrl } = await uploadVideoAndGetUrl(supabase, 
           videoFile, 
           setUploadProgress
         );
@@ -290,7 +290,7 @@ export function UploadVideoDialog({ isOpen, onOpenChange }: UploadVideoDialogPro
             notes: data.notes,
             assignedUserIds: isAdmin ? selectedUserIds : [],
         };
-        await addVideo(firestore, videoId, newVideoData, { id: user.id, name: user.name });
+        await addVideo(supabase, videoId, newVideoData, { id: user.id, name: user.name });
         toast({ title: '成功', description: '新影片專案已成功建立。' });
         
         handleClose();

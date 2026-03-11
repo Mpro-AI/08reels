@@ -6,8 +6,8 @@ import CommentSection from './comment-section';
 import VersionSection from './version-section';
 import { Video, Version, VersionStatus, Comment } from '@/lib/types';
 import type { AnnotationMode } from '@/app/videos/[id]/page';
-import { useFirestore } from '@/firebase';
-import { addCommentToVersion } from '@/firebase/firestore/videos';
+import { useSupabase } from '@/supabase';
+import { addCommentToVersion } from '@/supabase/db/videos';
 import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
@@ -36,16 +36,16 @@ export default function SidePanel({
     isAdmin,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
-  const firestore = useFirestore();
+  const supabase = useSupabase();
   const { user } = useAuth();
 
   const handleAddComment = (commentText: string) => {
-    if (!firestore || !user || !isAdmin) return;
+    if (!user || !isAdmin) return;
     const player = document.querySelector('video');
     const currentTime = player ? player.currentTime : 0;
 
     addCommentToVersion(
-      firestore,
+      supabase,
       video.id,
       selectedVersion.id,
       {

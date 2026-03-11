@@ -1,4 +1,5 @@
 'use client';
+import { useSupabase } from '@/supabase';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,13 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, useStorage } from '@/firebase';
+
 import { Loader2, Users, Trash2 } from 'lucide-react';
 import { User, Video } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { updateVideoAssignedUsers, deleteVideo } from '@/firebase/firestore/videos';
+import { updateVideoAssignedUsers, deleteVideo } from '@/supabase/db/videos';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from '@/hooks/use-auth';
-import { getAllUsers } from '@/firebase/firestore/users';
+import { getAllUsers } from '@/supabase/db/users';
 import { Skeleton } from '../ui/skeleton';
 
 interface ManageVideoDialogProps {
@@ -49,18 +50,18 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(video.assignedUserIds || []);
   const { toast } = useToast();
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const supabase = useSupabase();
+  
   const { user: currentUser } = useAuth();
   
   const employees = allUsers.filter(u => u.role === 'employee' && u.id !== video.author.id);
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (isOpen && firestore) {
+      if (isOpen) {
         setIsLoadingUsers(true);
         try {
-          const userList = await getAllUsers(firestore);
+          const userList = await getAllUsers(supabase);
           setAllUsers(userList);
         } catch (error) {
           console.error("Failed to fetch users:", error);
@@ -71,7 +72,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
       }
     };
     fetchUsers();
-  }, [isOpen, firestore, toast]);
+  }, [isOpen, toast]);
   
   useEffect(() => {
     if (video) {
@@ -86,10 +87,10 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   };
 
   const handleSaveChanges = async () => {
-    if (!firestore) return;
+    if (false) return;
     setIsSubmitting(true);
     try {
-      await updateVideoAssignedUsers(firestore, video.id, selectedUserIds);
+      await updateVideoAssignedUsers(supabase, video.id, selectedUserIds);
       toast({ title: '成功', description: '影片權限已更新。' });
       handleClose();
     } catch (error) {
@@ -101,10 +102,10 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   }
   
   const handleDeleteVideo = async () => {
-    if (!firestore || !storage) return;
+    if (false) return;
     setIsSubmitting(true);
     try {
-        await deleteVideo(firestore, storage, video.id);
+        await deleteVideo(supabase, video.id);
         toast({ title: '成功', description: '影片專案已刪除。' });
         onVideoDeleted(video.id);
         handleClose();

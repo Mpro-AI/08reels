@@ -8,8 +8,7 @@ import { Film, LogOut, Home, Shield } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { useCollection } from '@/supabase';
 import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {
@@ -28,15 +27,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const firestore = useFirestore();
-
   const videosQuery = useMemo(() => {
-    if (!firestore || !isAuthenticated) return null;
-    return query(
-      collection(firestore, 'videos'),
-      orderBy('uploadedAt', 'desc')
-    );
-  }, [firestore, isAuthenticated]);
+    if (!isAuthenticated) return null;
+    return { table: 'videos', orderBy: { column: 'uploaded_at', ascending: false }, enabled: true };
+  }, [isAuthenticated]);
 
   const { data: initialVideos, loading: videosLoading, error } = useCollection<Video>(videosQuery);
   const [videos, setVideos] = useState<Video[] | null>(null);
@@ -68,11 +62,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       console.log('🎬 Initial Videos data:', initialVideos);
       console.log('🎬 Filtered videos data:', filteredVideos);
       console.log('🎬 Videos error:', error);
-      console.log('🎬 Firestore:', firestore ? 'Connected' : 'Not connected');
+      console.log('🎬 Supabase: Connected');
       console.log('🎬 Authenticated:', isAuthenticated);
       console.log('👤 Current user:', user);
     }
-  }, [initialVideos, filteredVideos, videosLoading, error, firestore, isAuthenticated, user]);
+  }, [initialVideos, filteredVideos, videosLoading, error, isAuthenticated, user]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
