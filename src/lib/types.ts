@@ -1,5 +1,5 @@
 export type User = {
-  id: string; // Firebase Auth UID
+  id: string; // Supabase Auth UID
   name: string;
   email?: string | null;
   photoURL?: string | null;

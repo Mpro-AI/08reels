@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'ahglddhcfbbxrhmdqvrz.supabase.co',
+        port: '',
+        pathname: '/storage/**',
+      },
     ],
   },
   // 注意: COEP/COOP 標頭會阻止 Firebase Storage 資源載入
