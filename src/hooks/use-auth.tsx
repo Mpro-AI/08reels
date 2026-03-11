@@ -65,16 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const appUser = await upsertUserProfile(session.user);
-        setUser(appUser);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth state changes
+    // Supabase v2 fires INITIAL_SESSION automatically on mount.
+    // Do NOT call getSession() separately — it causes auth lock conflicts on refresh.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (session?.user) {
