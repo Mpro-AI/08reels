@@ -1,9 +1,9 @@
 'use client';
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
 import { useSupabase } from '@/supabase';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const supabase = useSupabase();
+  const resolvedRef = useRef(false);
 
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
@@ -71,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('[upsertUserProfile] unexpected error:', err);
-      // Fallback: return minimal user from auth data so app still works
       return {
         id: supabaseUser.id,
         name: supabaseUser.email?.split('@')[0] || 'Anonymous',
@@ -84,45 +84,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    resolvedRef.current = false;
 
-    // Safety net: if auth hasn't resolved after 8s, force loading off
-    const timeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('[auth] 8s timeout — forcing loading off');
+    // Idempotent session handler — safe to call multiple times
+    const handleSession = async (session: Session | null) => {
+      if (!mounted) return;
+      try {
+        if (session?.user) {
+          const appUser = await upsertUserProfile(session.user);
+          if (mounted) setUser(appUser);
+        } else {
+          if (mounted) setUser(null);
+        }
+      } catch (err) {
+        console.error('[auth] handleSession error:', err);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) {
+          resolvedRef.current = true;
+          setLoading(false);
+        }
+      }
+    };
+
+    // 1. Primary: onAuthStateChange handles ALL events including INITIAL_SESSION
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        await handleSession(session);
+      }
+    );
+
+    // 2. Fallback: if INITIAL_SESSION didn't fire within 3s
+    //    (React Strict Mode double-mount can cause it to be lost),
+    //    try getSession() as a backup.
+    //    This only runs if auth hasn't resolved yet (resolvedRef check).
+    const fallbackTimer = setTimeout(async () => {
+      if (!mounted || resolvedRef.current) return;
+      console.warn('[auth] INITIAL_SESSION not received after 3s, using getSession fallback');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted || resolvedRef.current) return;
+        await handleSession(session);
+      } catch (err) {
+        console.error('[auth] getSession fallback error:', err);
+        if (mounted) setLoading(false);
+      }
+    }, 3000);
+
+    // 3. Hard timeout: absolute safety net at 8s
+    const hardTimeout = setTimeout(() => {
+      if (mounted && !resolvedRef.current) {
+        console.warn('[auth] 8s hard timeout — forcing loading off');
         setLoading(false);
       }
     }, 8000);
 
-    // IMPORTANT: Do NOT call getSession() here — it competes with
-    // signInWithPassword() for the Supabase auth lock and causes login to hang.
-    // onAuthStateChange fires INITIAL_SESSION on mount, which handles the
-    // refresh case (reads cached session from localStorage).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        try {
-          if (session?.user) {
-            const appUser = await upsertUserProfile(session.user);
-            if (mounted) setUser(appUser);
-          } else {
-            if (mounted) setUser(null);
-          }
-        } catch (err) {
-          console.error('[onAuthStateChange] error:', err);
-          if (mounted) setUser(null);
-        } finally {
-          // ALWAYS clear loading — no matter what happens above
-          if (mounted) {
-            setLoading(false);
-            clearTimeout(timeout);
-          }
-        }
-      }
-    );
-
     return () => {
       mounted = false;
-      clearTimeout(timeout);
+      clearTimeout(fallbackTimer);
+      clearTimeout(hardTimeout);
       subscription.unsubscribe();
     };
   }, [supabase, upsertUserProfile]);
