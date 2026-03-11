@@ -86,28 +86,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    // Supabase v2 fires INITIAL_SESSION automatically on mount.
-    // Do NOT call getSession() separately — it causes auth lock conflicts on refresh.
+    let mounted = true;
+
+    // Safety net: if loading hasn't cleared after 5s, force it off.
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('[auth] 5s timeout — forcing loading off');
+        setLoading(false);
+      }
+    }, 5000);
+
+    // 1. getSession() for initial load — reads cached session from localStorage.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (session?.user) {
+          const appUser = await upsertUserProfile(session.user);
+          if (mounted) setUser(appUser);
+        } else {
+          if (mounted) setUser(null);
+        }
+      } catch (err) {
+        console.error('[getSession] error:', err);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    // 2. onAuthStateChange for subsequent updates only — skip INITIAL_SESSION.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        if (event === 'INITIAL_SESSION') return; // already handled by getSession
+
         try {
           if (session?.user) {
             const appUser = await upsertUserProfile(session.user);
-            setUser(appUser);
+            if (mounted) setUser(appUser);
           } else {
-            setUser(null);
+            if (mounted) setUser(null);
           }
         } catch (err) {
           console.error('[onAuthStateChange] error:', err);
-          setUser(null);
+          if (mounted) setUser(null);
         } finally {
-          // ALWAYS clear loading — no matter what happens above
-          setLoading(false);
+          if (mounted) setLoading(false);
         }
       }
     );
 
     return () => {
+      mounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, [supabase, upsertUserProfile]);
