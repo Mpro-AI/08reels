@@ -16,15 +16,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Build a minimal User from Supabase auth data (no DB call, never blocks). */
+function userFromAuth(supabaseUser: SupabaseUser): User {
+  return {
+    id: supabaseUser.id,
+    name: supabaseUser.email?.split('@')[0] || 'Anonymous',
+    email: supabaseUser.email,
+    photoURL: null,
+    role: 'employee',
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const supabase = useSupabase();
 
-  const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
-    if (!supabaseUser) return null;
-
+  // Enrich user profile from the DB (non-blocking, fire-and-forget).
+  // Called after the user is already set so auth is not blocked.
+  const enrichUserProfile = useCallback(async (supabaseUser: SupabaseUser) => {
     try {
       const { data: existingUser, error: selectError } = await supabase
         .from('users')
@@ -33,26 +44,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (selectError && selectError.code !== 'PGRST116') {
-        console.error('[upsertUserProfile] select error:', selectError);
+        console.error('[enrichUserProfile] select error:', selectError);
       }
 
       if (existingUser) {
-        return {
+        setUser({
           id: existingUser.id,
           name: existingUser.name || supabaseUser.email?.split('@')[0] || 'Anonymous',
           email: existingUser.email || supabaseUser.email,
           photoURL: existingUser.photo_url,
           role: existingUser.role === 'admin' ? 'admin' : 'employee',
-        };
+        });
       } else {
-        const appUser: User = {
-          id: supabaseUser.id,
-          name: supabaseUser.email?.split('@')[0] || 'Anonymous',
-          email: supabaseUser.email,
-          photoURL: null,
-          role: 'employee',
-        };
-
+        // New user — insert into users table
+        const appUser: User = userFromAuth(supabaseUser);
         const { error: insertError } = await supabase
           .from('users')
           .insert({
@@ -64,40 +69,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
         if (insertError) {
-          console.error('[upsertUserProfile] insert error:', insertError);
+          console.error('[enrichUserProfile] insert error:', insertError);
         }
-
-        return appUser;
+        // User object stays as the auth-derived one (already set)
       }
     } catch (err) {
-      console.error('[upsertUserProfile] unexpected error:', err);
-      // Fallback: return minimal user from auth data so app still works
-      return {
-        id: supabaseUser.id,
-        name: supabaseUser.email?.split('@')[0] || 'Anonymous',
-        email: supabaseUser.email,
-        photoURL: null,
-        role: 'employee',
-      };
+      console.error('[enrichUserProfile] unexpected error:', err);
+      // User object stays as the auth-derived one (already set)
     }
   }, [supabase]);
 
   useEffect(() => {
     let mounted = true;
-    // Timer used when INITIAL_SESSION fires with null — we wait briefly for
-    // TOKEN_REFRESHED before concluding the user is truly logged out.
+    let initialResolved = false;
     let nullSessionTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Hard safety net: force loading off after 8s no matter what
     const hardTimeout = setTimeout(() => {
-      if (mounted) {
+      if (mounted && !initialResolved) {
         console.warn('[auth] 8s hard timeout — forcing loading off');
+        initialResolved = true;
         setLoading(false);
       }
     }, 8000);
 
-    const resolve = (appUser: User | null) => {
-      if (!mounted) return;
+    const resolveInitial = (appUser: User | null) => {
+      if (!mounted || initialResolved) return;
+      initialResolved = true;
       if (nullSessionTimer) { clearTimeout(nullSessionTimer); nullSessionTimer = null; }
       clearTimeout(hardTimeout);
       setUser(appUser);
@@ -105,31 +103,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
 
-        // If a better event (e.g. TOKEN_REFRESHED) arrives, cancel any pending timer
-        if (nullSessionTimer) { clearTimeout(nullSessionTimer); nullSessionTimer = null; }
+        // Cancel any pending null-session timer when a session arrives
+        if (nullSessionTimer && session?.user) {
+          clearTimeout(nullSessionTimer);
+          nullSessionTimer = null;
+        }
 
         if (session?.user) {
-          // Valid session — process it
-          try {
-            const appUser = await upsertUserProfile(session.user);
-            resolve(appUser);
-          } catch (err) {
-            console.error('[onAuthStateChange] error:', err);
-            resolve(null);
+          // Set user immediately from auth data (never blocks / deadlocks)
+          const authUser = userFromAuth(session.user);
+          if (!initialResolved) {
+            resolveInitial(authUser);
+          } else {
+            setUser(prev => prev ?? authUser);
           }
+          // Enrich with DB profile data in the background (non-blocking)
+          enrichUserProfile(session.user);
         } else if (event === 'INITIAL_SESSION') {
-          // null on INITIAL_SESSION may mean the access token is expired and
-          // Supabase is mid-refresh (TOKEN_REFRESHED will follow shortly).
-          // Wait 1.5s before declaring the user logged out.
+          // null INITIAL_SESSION: token may be expired, Supabase is mid-refresh.
+          // SIGNED_IN / TOKEN_REFRESHED will follow shortly.
           nullSessionTimer = setTimeout(() => {
-            if (mounted) resolve(null);
-          }, 1500);
-        } else {
-          // SIGNED_OUT or any other null-session event = definitively logged out
-          resolve(null);
+            if (mounted && !initialResolved) resolveInitial(null);
+          }, 3000);
+        } else if (event === 'SIGNED_OUT') {
+          if (!initialResolved) {
+            resolveInitial(null);
+          } else {
+            setUser(null);
+          }
         }
       }
     );
@@ -140,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nullSessionTimer) clearTimeout(nullSessionTimer);
       subscription.unsubscribe();
     };
-  }, [supabase, upsertUserProfile]);
+  }, [supabase, enrichUserProfile]);
 
   const isAuthenticated = !!user;
 
