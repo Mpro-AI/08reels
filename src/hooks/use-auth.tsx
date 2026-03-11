@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import { useToast } from '@/hooks/use-toast';
 import type { User } from '@/lib/types';
 import { useSupabase } from '@/supabase';
-import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const supabase = useSupabase();
-  const resolvedRef = useRef(false);
 
   const upsertUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<User | null> => {
     if (!supabaseUser) return null;
@@ -72,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('[upsertUserProfile] unexpected error:', err);
+      // Fallback: return minimal user from auth data so app still works
       return {
         id: supabaseUser.id,
         name: supabaseUser.email?.split('@')[0] || 'Anonymous',
@@ -84,65 +84,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    resolvedRef.current = false;
+    // Timer used when INITIAL_SESSION fires with null — we wait briefly for
+    // TOKEN_REFRESHED before concluding the user is truly logged out.
+    let nullSessionTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Idempotent session handler — safe to call multiple times
-    const handleSession = async (session: Session | null) => {
-      if (!mounted) return;
-      try {
-        if (session?.user) {
-          const appUser = await upsertUserProfile(session.user);
-          if (mounted) setUser(appUser);
-        } else {
-          if (mounted) setUser(null);
-        }
-      } catch (err) {
-        console.error('[auth] handleSession error:', err);
-        if (mounted) setUser(null);
-      } finally {
-        if (mounted) {
-          resolvedRef.current = true;
-          setLoading(false);
-        }
-      }
-    };
-
-    // 1. Primary: onAuthStateChange handles ALL events including INITIAL_SESSION
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        await handleSession(session);
-      }
-    );
-
-    // 2. Fallback: if INITIAL_SESSION didn't fire within 3s
-    //    (React Strict Mode double-mount can cause it to be lost),
-    //    try getSession() as a backup.
-    //    This only runs if auth hasn't resolved yet (resolvedRef check).
-    const fallbackTimer = setTimeout(async () => {
-      if (!mounted || resolvedRef.current) return;
-      console.warn('[auth] INITIAL_SESSION not received after 3s, using getSession fallback');
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted || resolvedRef.current) return;
-        await handleSession(session);
-      } catch (err) {
-        console.error('[auth] getSession fallback error:', err);
-        if (mounted) setLoading(false);
-      }
-    }, 3000);
-
-    // 3. Hard timeout: absolute safety net at 8s
+    // Hard safety net: force loading off after 8s no matter what
     const hardTimeout = setTimeout(() => {
-      if (mounted && !resolvedRef.current) {
+      if (mounted) {
         console.warn('[auth] 8s hard timeout — forcing loading off');
         setLoading(false);
       }
     }, 8000);
 
+    const resolve = (appUser: User | null) => {
+      if (!mounted) return;
+      if (nullSessionTimer) { clearTimeout(nullSessionTimer); nullSessionTimer = null; }
+      clearTimeout(hardTimeout);
+      setUser(appUser);
+      setLoading(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+
+        // If a better event (e.g. TOKEN_REFRESHED) arrives, cancel any pending timer
+        if (nullSessionTimer) { clearTimeout(nullSessionTimer); nullSessionTimer = null; }
+
+        if (session?.user) {
+          // Valid session — process it
+          try {
+            const appUser = await upsertUserProfile(session.user);
+            resolve(appUser);
+          } catch (err) {
+            console.error('[onAuthStateChange] error:', err);
+            resolve(null);
+          }
+        } else if (event === 'INITIAL_SESSION') {
+          // null on INITIAL_SESSION may mean the access token is expired and
+          // Supabase is mid-refresh (TOKEN_REFRESHED will follow shortly).
+          // Wait 1.5s before declaring the user logged out.
+          nullSessionTimer = setTimeout(() => {
+            if (mounted) resolve(null);
+          }, 1500);
+        } else {
+          // SIGNED_OUT or any other null-session event = definitively logged out
+          resolve(null);
+        }
+      }
+    );
+
     return () => {
       mounted = false;
-      clearTimeout(fallbackTimer);
       clearTimeout(hardTimeout);
+      if (nullSessionTimer) clearTimeout(nullSessionTimer);
       subscription.unsubscribe();
     };
   }, [supabase, upsertUserProfile]);
@@ -152,8 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      // Race signInWithPassword against a 10s timeout.
+      // Prevents infinite "Processing..." if the auth lock is held by a background refresh.
+      const loginResult = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<{ error: Error }>(resolve =>
+          setTimeout(() => resolve({ error: new Error('LOGIN_TIMEOUT') }), 10000)
+        ),
+      ]);
+
+      if (loginResult.error) {
+        if ((loginResult.error as any).message === 'LOGIN_TIMEOUT') {
+          throw new Error('登入超時，請重新整理頁面後再試。');
+        }
+        throw loginResult.error;
+      }
+
       toast({ title: '登入成功' });
       return true;
     } catch (error: any) {
@@ -161,6 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let description = '發生未知錯誤，請稍後再試。';
       if (error.message?.includes('Invalid login credentials')) {
         description = '電子郵件或密碼不正確。';
+      } else if (error.message?.includes('登入超時')) {
+        description = error.message;
       }
       toast({ variant: 'destructive', title: '登入失敗', description });
       setLoading(false);
