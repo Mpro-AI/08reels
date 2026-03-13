@@ -17,7 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { cn } from '@/lib/utils';
-import type { AnnotationMode } from '@/app/videos/[id]/page';
+import type { AnnotationMode } from '@/components/video/annotations/types';
 
 
 interface CommentSectionProps {

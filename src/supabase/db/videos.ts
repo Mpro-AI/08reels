@@ -150,6 +150,24 @@ export async function updateAnnotationInVersion(
   }
 }
 
+export async function deleteAnnotationFromVersion(
+  supabase: SupabaseClient,
+  videoId: string,
+  versionId: string,
+  annotationId: string,
+) {
+  const { error } = await supabase
+    .from('annotations')
+    .delete()
+    .eq('id', annotationId)
+    .eq('version_id', versionId);
+
+  if (error) {
+    console.error('deleteAnnotationFromVersion failed:', error);
+    throw error;
+  }
+}
+
 export async function addCommentToVersion(
   supabase: SupabaseClient,
   videoId: string,
