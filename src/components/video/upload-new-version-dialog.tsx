@@ -1,5 +1,4 @@
 'use client';
-import { useSupabase } from '@/supabase';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,8 +20,8 @@ import { Loader2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
-import { uploadVideoAndGetUrl } from '@/supabase/storage';
-import { addNewVersion } from '@/supabase/db/videos';
+import { uploadVideoAndGetUrl } from '@/firebase/storage';
+import { addNewVersion } from '@/firebase/db/videos';
 import {
   Form,
   FormControl,
@@ -72,8 +71,7 @@ export function UploadNewVersionDialog({
 
   const { toast } = useToast();
   const { user } = useAuth();
-  const supabase = useSupabase();
-  
+
 
   const form = useForm<UploadNewVersionForm>({
     resolver: zodResolver(formSchema),
@@ -109,14 +107,14 @@ export function UploadNewVersionDialog({
       const videoFile = data.videoFile[0];
 
       // We only need the video URL, thumbnail is already set for the project.
-      const { videoUrl, thumbnailUrl } = await uploadVideoAndGetUrl(supabase,
+      const { videoUrl, thumbnailUrl } = await uploadVideoAndGetUrl(
         videoFile,
         setUploadProgress,
         videoId,
         newVersionNumber
       );
 
-      await addNewVersion(supabase,
+      await addNewVersion(
         videoId,
         {
           videoUrl: videoUrl,

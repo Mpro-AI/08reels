@@ -7,8 +7,8 @@ import SidePanel from '@/components/video/side-panel';
 import type { Video, VersionStatus } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { useDoc, useSupabase } from '@/supabase';
-import { setVersionStatus, deleteCommentFromVersion } from '@/supabase/db/videos';
+import { useDoc } from '@/firebase';
+import { setVersionStatus, deleteCommentFromVersion } from '@/firebase/db/videos';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AppLayoutContext } from '@/components/app-layout';
 import {
@@ -38,7 +38,6 @@ import type { TextAnnotationData, Annotation } from '@/lib/types';
 export default function VideoPage() {
   const params = useParams();
   const videoId = params.id as string;
-  const supabase = useSupabase();
   const { user } = useAuth();
   const { videos: allVideos, loading: videosLoading } = useContext(AppLayoutContext);
 
@@ -112,7 +111,6 @@ export default function VideoPage() {
   }, []);
 
   const annotations = useAnnotations({
-    supabase,
     videoId,
     versionId: selectedVersionId || '',
     existingAnnotations: selectedVersion?.annotations || [],
@@ -269,15 +267,15 @@ export default function VideoPage() {
       toast({ variant: 'destructive', title: '權限不足', description: '只有管理員或專案作者才能變更版本狀態。' });
       return;
     }
-    setVersionStatus(supabase, video.id, versionId, status);
+    setVersionStatus(video.id, versionId, status);
     toast({ title: '版本狀態已更新' });
-  }, [supabase, video, user, toast]);
+  }, [video, user, toast]);
 
   const handleDeleteComment = useCallback((commentId: string) => {
     if (!video || !user || !selectedVersionId) return;
-    deleteCommentFromVersion(supabase, video.id, selectedVersionId, commentId);
+    deleteCommentFromVersion(video.id, selectedVersionId, commentId);
     toast({ variant: 'default', title: '評論已刪除' });
-  }, [supabase, video, user, selectedVersionId, toast]);
+  }, [video, user, selectedVersionId, toast]);
 
   // --- Enter annotation mode (pause video) ---
   const handleEnterAnnotation = useCallback((mode: AnnotationMode) => {

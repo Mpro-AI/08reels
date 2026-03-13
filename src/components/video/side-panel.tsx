@@ -7,8 +7,7 @@ import VersionSection from './version-section';
 import { Video, Version, VersionStatus, Comment } from '@/lib/types';
 import type { AnnotationMode } from '@/components/video/annotations/types';
 import { formatTime } from '@/components/video/annotations/utils';
-import { useSupabase } from '@/supabase';
-import { addCommentToVersion } from '@/supabase/db/videos';
+import { addCommentToVersion } from '@/firebase/db/videos';
 import { useAuth } from '@/hooks/use-auth';
 
 interface SidePanelProps {
@@ -37,7 +36,6 @@ export default function SidePanel({
     isAdmin,
 }: SidePanelProps) {
   const [commentInput, setCommentInput] = useState('');
-  const supabase = useSupabase();
   const { user } = useAuth();
 
   const handleAddComment = (commentText: string) => {
@@ -46,7 +44,6 @@ export default function SidePanel({
     const currentTime = player ? player.currentTime : 0;
 
     addCommentToVersion(
-      supabase,
       video.id,
       selectedVersion.id,
       {

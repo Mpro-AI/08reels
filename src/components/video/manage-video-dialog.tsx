@@ -1,5 +1,4 @@
 'use client';
-import { useSupabase } from '@/supabase';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +20,7 @@ import { User, Video } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { updateVideoAssignedUsers, deleteVideo } from '@/supabase/db/videos';
+import { updateVideoAssignedUsers, deleteVideo } from '@/firebase/db/videos';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from '@/hooks/use-auth';
-import { getAllUsers } from '@/supabase/db/users';
+import { getAllUsers } from '@/firebase/db/users';
 import { Skeleton } from '../ui/skeleton';
 
 interface ManageVideoDialogProps {
@@ -50,8 +49,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(video.assignedUserIds || []);
   const { toast } = useToast();
-  const supabase = useSupabase();
-  
+
   const { user: currentUser } = useAuth();
   
   const employees = allUsers.filter(u => u.role === 'employee' && u.id !== video.author.id);
@@ -61,7 +59,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
       if (isOpen) {
         setIsLoadingUsers(true);
         try {
-          const userList = await getAllUsers(supabase);
+          const userList = await getAllUsers();
           setAllUsers(userList);
         } catch (error) {
           console.error("Failed to fetch users:", error);
@@ -90,7 +88,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
     if (false) return;
     setIsSubmitting(true);
     try {
-      await updateVideoAssignedUsers(supabase, video.id, selectedUserIds);
+      await updateVideoAssignedUsers(video.id, selectedUserIds);
       toast({ title: '成功', description: '影片權限已更新。' });
       handleClose();
     } catch (error) {
@@ -105,7 +103,7 @@ export function ManageVideoDialog({ isOpen, onOpenChange, video, onVideoDeleted 
     if (false) return;
     setIsSubmitting(true);
     try {
-        await deleteVideo(supabase, video.id);
+        await deleteVideo(video.id);
         toast({ title: '成功', description: '影片專案已刪除。' });
         onVideoDeleted(video.id);
         handleClose();

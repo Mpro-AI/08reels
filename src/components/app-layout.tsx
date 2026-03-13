@@ -8,7 +8,7 @@ import { Film, LogOut, Home, Shield } from 'lucide-react';
 import { Icons } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { useCollection } from '@/supabase';
+import { useCollection } from '@/firebase';
 import type { Video } from '@/lib/types';
 
 interface AppLayoutContextType {

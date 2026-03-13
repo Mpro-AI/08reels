@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/hooks/use-auth';
-import { SupabaseProvider } from '@/supabase';
+import { FirebaseProvider } from '@/firebase';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import './globals.css';
@@ -23,12 +23,12 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className={cn('font-body antialiased')}>
-        <SupabaseProvider>
+        <FirebaseProvider>
           <AuthProvider>
             {children}
             <Toaster />
           </AuthProvider>
-        </SupabaseProvider>
+        </FirebaseProvider>
       </body>
     </html>
   );

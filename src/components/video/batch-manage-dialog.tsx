@@ -1,5 +1,4 @@
 'use client';
-import { useSupabase } from '@/supabase';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,7 +17,7 @@ import { User, Video } from '@/lib/types';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
-import { updateVideoAssignedUsers, deleteVideo } from '@/supabase/db/videos';
+import { updateVideoAssignedUsers, deleteVideo } from '@/firebase/db/videos';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { getAllUsers } from '@/supabase/db/users';
+import { getAllUsers } from '@/firebase/db/users';
 import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
@@ -57,8 +56,7 @@ export function BatchManageDialog({
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-  const supabase = useSupabase();
-  
+
   const { user: currentUser } = useAuth();
 
   const employees = allUsers.filter(u => u.role === 'employee');
@@ -87,7 +85,7 @@ export function BatchManageDialog({
       if (isOpen) {
         setIsLoadingUsers(true);
         try {
-          const userList = await getAllUsers(supabase);
+          const userList = await getAllUsers();
           setAllUsers(userList);
         } catch (error) {
           console.error("Failed to fetch users:", error);
@@ -118,7 +116,7 @@ export function BatchManageDialog({
 
     try {
       const updatePromises = selectedVideos.map(video =>
-        updateVideoAssignedUsers(supabase, video.id, selectedUserIds)
+        updateVideoAssignedUsers(video.id, selectedUserIds)
       );
 
       await Promise.all(updatePromises);
@@ -182,7 +180,7 @@ export function BatchManageDialog({
         const video = canDeleteVideos[i];
         console.log(`🔴 Deleting video ${i + 1}/${totalVideos}: ${video.title} (${video.id})`);
         try {
-          await deleteVideo(supabase, video.id);
+          await deleteVideo(video.id);
           deletedIds.push(video.id);
           setDeleteProgress(((i + 1) / totalVideos) * 100);
           console.log(`✅ Successfully deleted: ${video.title}`);

@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
-import { useSupabase, useCollection } from '@/supabase';
+import { useCollection } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/firebase/client';
 import type { User } from '@/lib/types';
 import {
   Table,
@@ -22,7 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 
 export function UserManagementTable() {
-  const supabase = useSupabase();
   const { user: currentUser } = useAuth();
   const { data: users, loading } = useCollection<User>({ table: 'users', enabled: true });
   const { toast } = useToast();
@@ -41,7 +41,7 @@ export function UserManagementTable() {
     }
 
     try {
-      await supabase.from('users').update({ role: newRole }).eq('id', userId);
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
       toast({
         title: '成功',
         description: '已更新使用者角色。',
