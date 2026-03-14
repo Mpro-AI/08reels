@@ -33,9 +33,9 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'studio-3640087795-37708.firebasestorage.app',
+        hostname: 'ahglddhcfbbxrhmdqvrz.supabase.co',
         port: '',
-        pathname: '/**',
+        pathname: '/storage/**',
       },
     ],
   },

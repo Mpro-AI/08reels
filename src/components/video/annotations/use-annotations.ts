@@ -6,10 +6,12 @@ import type { Annotation, PenAnnotationData, ImageAnnotationData, TextAnnotation
 import type { AnnotationMode, Point, CanvasScale } from './types';
 import { useAnnotationHistory } from './use-annotation-history';
 import { screenToCanvas, calculateActualFontSize, NEW_ANNOTATION_PREFIX, isNewAnnotation } from './utils';
-import { addAnnotationsToVersion, updateAnnotationInVersion, deleteAnnotationFromVersion } from '@/firebase/db/videos';
-import { uploadAnnotationImage } from '@/firebase/storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { addAnnotationsToVersion, updateAnnotationInVersion, deleteAnnotationFromVersion } from '@/supabase/db/videos';
+import { uploadAnnotationImage } from '@/supabase/storage';
 
 interface UseAnnotationsProps {
+  readonly supabase: SupabaseClient;
   readonly videoId: string;
   readonly versionId: string;
   readonly existingAnnotations: Annotation[];
@@ -23,6 +25,7 @@ interface UseAnnotationsProps {
 }
 
 export function useAnnotations({
+  supabase,
   videoId,
   versionId,
   existingAnnotations,
@@ -139,7 +142,7 @@ export function useAnnotations({
     setAnnotationMode('select');
 
     try {
-      const imageUrl = await uploadAnnotationImage(file, videoId, versionId);
+      const imageUrl = await uploadAnnotationImage(supabase, file, videoId, versionId);
 
       const tempImg = new Image();
       tempImg.src = URL.createObjectURL(file);
@@ -186,7 +189,7 @@ export function useAnnotations({
       setIsUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
-  }, [user, videoId, versionId, canvasScale, currentTime, history, onToast, onSelectAnnotation]);
+  }, [user, supabase, videoId, versionId, canvasScale, currentTime, history, onToast, onSelectAnnotation]);
 
   const handleImageFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -261,18 +264,18 @@ export function useAnnotations({
           const { id: _id, ...rest } = cleaned;
           return rest;
         });
-        promises.push(addAnnotationsToVersion(videoId, versionId, toAdd as Omit<Annotation, 'id'>[]));
+        promises.push(addAnnotationsToVersion(supabase, videoId, versionId, toAdd as Omit<Annotation, 'id'>[]));
       }
 
       // Update modified annotations (batch)
       for (const [, annotation] of modifiedAnnotations) {
         const cleaned = cleanAnnotationData(annotation);
-        promises.push(updateAnnotationInVersion(videoId, versionId, cleaned));
+        promises.push(updateAnnotationInVersion(supabase, videoId, versionId, cleaned));
       }
 
       // Delete saved annotations (batch)
       for (const id of deletedSavedIds) {
-        promises.push(deleteAnnotationFromVersion(videoId, versionId, id));
+        promises.push(deleteAnnotationFromVersion(supabase, videoId, versionId, id));
       }
 
       await Promise.all(promises);
@@ -290,7 +293,7 @@ export function useAnnotations({
       onToast({ variant: 'destructive', title: '儲存失敗', description: '無法儲存註解，請稍後再試。' });
       throw error;
     }
-  }, [user, hasUnsavedChanges, history, modifiedAnnotations, deletedSavedIds, videoId, versionId, onToast]);
+  }, [user, hasUnsavedChanges, history, modifiedAnnotations, deletedSavedIds, supabase, videoId, versionId, onToast]);
 
   // --- Exit ---
 
